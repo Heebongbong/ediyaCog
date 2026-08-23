@@ -1,14 +1,16 @@
-// ── 설정: 장부(data.json)가 있는 GitHub 저장소 (private) ────
+// ── 설정 ────────────────────────────────────────────────────
+// 데이터는 GitHub 저장소에 있지만, 브라우저는 GitHub에 직접 가지 않고
+// Cloudflare Worker(worker/worker.js)를 경유한다. GitHub 토큰은 Worker에만 있다.
 const CONFIG = {
-  owner: "Heebongbong",
-  repo: "ediyaData",
+  workerUrl: "https://ediya-ledger.gmldyd031.workers.dev",
   branch: "main",
   path: "data.json",
   backupDir: "backups", // 백업 파일을 모아두는 폴더 (원본과 구분)
   archiveDir: "archives", // 이월 정리된 과거 로그를 보관하는 폴더
 };
-const TOKEN_KEY = "ediya-ledger-token";
-const API_BASE = `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}`;
+const PIN_KEY = "ediya-ledger-pin";
+const PIN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 저장된 PIN 유효기간 (7일)
+const API_BASE = CONFIG.workerUrl;
 const API_URL = `${API_BASE}/contents/${CONFIG.path}`;
 const BACKUP_NAME_RE = /^data_\d{4}-\d{2}-\d{2}\.json$/;
 const ARCHIVE_NAME_RE = /^logs_\d{4}-\d{2}-\d{2}_\d{4}\.json$/;
@@ -16,7 +18,32 @@ const ARCHIVE_NAME_RE = /^logs_\d{4}-\d{2}-\d{2}_\d{4}\.json$/;
 const HISTORY_ICON =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>';
 
-let token = localStorage.getItem(TOKEN_KEY) || "";
+// PIN은 저장 시각과 함께 보관하고, 유효기간이 지나면 자동 삭제
+let pinExpired = false;
+
+function loadSavedPin() {
+  localStorage.removeItem("ediya-ledger-token"); // 예전 GitHub 토큰 저장분 정리
+  const raw = localStorage.getItem(PIN_KEY);
+  if (!raw) return "";
+  try {
+    const saved = JSON.parse(raw);
+    if (!saved.value || Date.now() - saved.savedAt > PIN_TTL_MS) {
+      localStorage.removeItem(PIN_KEY);
+      pinExpired = !!saved.value;
+      return "";
+    }
+    return saved.value;
+  } catch {
+    localStorage.removeItem(PIN_KEY);
+    return "";
+  }
+}
+
+function savePin(value) {
+  localStorage.setItem(PIN_KEY, JSON.stringify({ value, savedAt: Date.now() }));
+}
+
+let pin = loadSavedPin();
 let ledger = null;
 let fileSha = null; // 저장 시 충돌 감지에 쓰는 GitHub contents sha
 let currentCustomerId = null;
@@ -102,10 +129,7 @@ function wouldGoNegative(customer) {
 
 // ── GitHub API ──────────────────────────────────────────────
 function apiHeaders() {
-  return {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/vnd.github+json",
-  };
+  return { "X-Store-Pin": pin };
 }
 
 function decodeContent(base64) {
@@ -127,8 +151,8 @@ async function loadLedger() {
   });
   if (!res.ok) {
     const messages = {
-      401: "서비스 키가 올바르지 않습니다.",
-      403: "권한이 없습니다. 서비스 키를 확인해주세요.",
+      401: "PIN이 올바르지 않습니다.",
+      403: "허용되지 않은 요청입니다. 관리자에게 문의해주세요.",
       404: "장부 데이터를 찾을 수 없습니다. 관리자에게 문의해주세요.",
     };
     const err = new Error(messages[res.status] || `서버 응답 오류 (${res.status})`);
@@ -198,7 +222,7 @@ function showScreen(name) {
   $("gateView").classList.toggle("hidden", name !== "gate");
   $("loadingView").classList.toggle("hidden", name !== "loading");
   $("appView").classList.toggle("hidden", name !== "app");
-  if (name === "gate") $("tokenInput").focus();
+  if (name === "gate") $("pinInput").focus();
 }
 
 function setSaveStatus(state, label) {
@@ -633,7 +657,7 @@ async function createBackup() {
     if (!$("backupModal").classList.contains("hidden")) renderBackupList();
   } catch (err) {
     setSaveStatus("error", "백업 실패");
-    alert("백업에 실패했습니다. 네트워크와 서비스 키를 확인해주세요.");
+    alert("백업에 실패했습니다. 네트워크와 PIN을 확인해주세요.");
   }
 }
 
@@ -659,7 +683,7 @@ async function archiveLogs() {
     await commitLedgerFile(archivePath, `로그 아카이브 (${archiveName})`);
   } catch (err) {
     setSaveStatus("error", "이월 실패");
-    alert("아카이브 저장에 실패했습니다. 네트워크와 서비스 키를 확인해주세요.");
+    alert("아카이브 저장에 실패했습니다. 네트워크와 PIN을 확인해주세요.");
     return;
   }
 
@@ -864,10 +888,10 @@ function openLogModal(customerId) {
 // ── 토큰 게이트 / 시작 ──────────────────────────────────────
 async function handleGateSubmit(e) {
   e.preventDefault();
-  const value = $("tokenInput").value.trim();
+  const value = $("pinInput").value.trim();
   if (!value) return;
 
-  token = value;
+  pin = value;
   const btn = $("gateBtn");
   btn.disabled = true;
   btn.textContent = "확인 중…";
@@ -875,14 +899,14 @@ async function handleGateSubmit(e) {
 
   try {
     await loadLedger();
-    localStorage.setItem(TOKEN_KEY, token);
-    $("tokenInput").value = "";
+    savePin(pin);
+    $("pinInput").value = "";
     $("saveStatus").classList.remove("hidden");
     setSaveStatus("synced");
     showScreen("app");
     render();
   } catch (err) {
-    token = "";
+    pin = "";
     $("gateError").textContent = err.message || "장부를 불러오지 못했습니다.";
   } finally {
     btn.disabled = false;
@@ -891,9 +915,9 @@ async function handleGateSubmit(e) {
 }
 
 function logout() {
-  if (!confirm("로그아웃할까요? 다시 이용하려면 서비스 키를 입력해야 합니다.")) return;
-  localStorage.removeItem(TOKEN_KEY);
-  token = "";
+  if (!confirm("로그아웃할까요? 다시 이용하려면 PIN을 입력해야 합니다.")) return;
+  localStorage.removeItem(PIN_KEY);
+  pin = "";
   ledger = null;
   fileSha = null;
   location.hash = "#/";
@@ -901,8 +925,11 @@ function logout() {
 }
 
 async function init() {
-  if (!token) {
+  if (!pin) {
     showScreen("gate");
+    if (pinExpired) {
+      $("gateError").textContent = "보안을 위해 저장된 PIN이 만료되었습니다. 다시 입력해주세요.";
+    }
     return;
   }
   showScreen("loading");
@@ -915,7 +942,7 @@ async function init() {
   } catch (err) {
     showScreen("gate");
     $("gateError").textContent = err.status === 401
-      ? "저장된 서비스 키가 만료되었거나 올바르지 않습니다. 다시 입력해주세요."
+      ? "저장된 PIN이 올바르지 않습니다. 다시 입력해주세요."
       : (err.message || "장부를 불러오지 못했습니다.");
   }
 }
