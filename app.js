@@ -5,11 +5,13 @@ const CONFIG = {
   branch: "main",
   path: "data.json",
   backupDir: "backups", // 백업 파일을 모아두는 폴더 (원본과 구분)
+  archiveDir: "archives", // 이월 정리된 과거 로그를 보관하는 폴더
 };
 const TOKEN_KEY = "ediya-ledger-token";
 const API_BASE = `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}`;
 const API_URL = `${API_BASE}/contents/${CONFIG.path}`;
 const BACKUP_NAME_RE = /^data_\d{4}-\d{2}-\d{2}\.json$/;
+const ARCHIVE_NAME_RE = /^logs_\d{4}-\d{2}-\d{2}_\d{4}\.json$/;
 
 const HISTORY_ICON =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>';
@@ -215,7 +217,7 @@ function setSaveStatus(state, label) {
 }
 
 // ── 모달 공통 ───────────────────────────────────────────────
-const MODAL_IDS = ["logModal", "backupModal", "customerModal"];
+const MODAL_IDS = ["logModal", "backupModal", "archiveModal", "customerModal"];
 
 function openModal(id) {
   $(id).classList.remove("hidden");
@@ -590,34 +592,38 @@ async function handleCustomerSubmit(e) {
   }
 }
 
-// ── 백업: 생성 / 목록 / CSV 다운로드 ────────────────────────
+// ── 백업·아카이브: 생성 / 이월 / 목록 / CSV 다운로드 ────────
+// 현재 장부를 지정 경로에 커밋 (이미 있으면 덮어씀)
+async function commitLedgerFile(path, message) {
+  const url = `${API_BASE}/contents/${path}`;
+  // 이미 있는 파일이면 sha가 필요하므로 먼저 조회
+  const existing = await fetch(`${url}?ref=${CONFIG.branch}`, {
+    headers: apiHeaders(),
+    cache: "no-store",
+  });
+  const sha = existing.ok ? (await existing.json()).sha : undefined;
+
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: apiHeaders(),
+    body: JSON.stringify({
+      message,
+      branch: CONFIG.branch,
+      content: encodeContent(JSON.stringify(ledger, null, 2)),
+      ...(sha ? { sha } : {}),
+    }),
+  });
+  if (!res.ok) throw new Error(`커밋 실패 (${res.status})`);
+}
+
 async function createBackup() {
   if (!ledger) return;
-  const backupName = `data_${nowStamp().slice(0, 10)}.json`;
-  const backupPath = `${CONFIG.backupDir}/${backupName}`;
+  const backupPath = `${CONFIG.backupDir}/data_${nowStamp().slice(0, 10)}.json`;
   if (!confirm(`현재 장부를 ${backupPath} 파일로 백업할까요?\n오늘 백업한 파일이 이미 있으면 덮어씁니다.`)) return;
 
-  const url = `${API_BASE}/contents/${backupPath}`;
   setSaveStatus("saving", "백업 중…");
   try {
-    // 이미 있는 파일이면 sha가 필요하므로 먼저 조회
-    const existing = await fetch(`${url}?ref=${CONFIG.branch}`, {
-      headers: apiHeaders(),
-      cache: "no-store",
-    });
-    const sha = existing.ok ? (await existing.json()).sha : undefined;
-
-    const res = await fetch(url, {
-      method: "PUT",
-      headers: apiHeaders(),
-      body: JSON.stringify({
-        message: `장부 백업 (${backupPath})`,
-        branch: CONFIG.branch,
-        content: encodeContent(JSON.stringify(ledger, null, 2)),
-        ...(sha ? { sha } : {}),
-      }),
-    });
-    if (!res.ok) throw new Error(`백업 실패 (${res.status})`);
+    await commitLedgerFile(backupPath, `장부 백업 (${backupPath})`);
     setSaveStatus("saved", `백업 완료 ${new Date().toTimeString().slice(0, 5)}`);
     // 백업 목록 팝업이 열려 있을 때만 목록 갱신 (불필요한 조회 방지)
     if (!$("backupModal").classList.contains("hidden")) renderBackupList();
@@ -627,13 +633,65 @@ async function createBackup() {
   }
 }
 
+// 로그 이월 정리: 현재 로그 전체를 아카이브 파일로 보관한 뒤,
+// 각 고객의 로그를 "이월 잔액" 충전 1건으로 압축해 data.json을 작게 유지
+async function archiveLogs() {
+  if (!ledger) return;
+  const stampStr = nowStamp();
+  const archiveName = `logs_${stampStr.slice(0, 10)}_${stampStr.slice(11).replace(":", "")}.json`;
+  const archivePath = `${CONFIG.archiveDir}/${archiveName}`;
+  const logCount = (ledger.customers || []).reduce((sum, c) => sum + (c.logs || []).length, 0);
+
+  if (!confirm(
+    `로그 이월 정리를 실행할까요?\n\n` +
+    `· 현재 로그 ${logCount}건을 ${archivePath}에 보관합니다.\n` +
+    `· 각 고객의 로그는 "이월 잔액" 1건으로 압축됩니다.\n` +
+    `· 잔액은 그대로 유지되며, 과거 내역은 아카이브 목록에서 볼 수 있습니다.`
+  )) return;
+
+  setSaveStatus("saving", "이월 정리 중…");
+  try {
+    // 아카이브 저장이 성공한 뒤에만 원본을 압축 (중간 실패 시 데이터 손실 없음)
+    await commitLedgerFile(archivePath, `로그 아카이브 (${archiveName})`);
+  } catch (err) {
+    setSaveStatus("error", "이월 실패");
+    alert("아카이브 저장에 실패했습니다. 네트워크와 서비스 키를 확인해주세요.");
+    return;
+  }
+
+  const before = ledger.customers;
+  ledger.customers = before.map((c) => {
+    const balance = balanceOf(c);
+    return {
+      ...c,
+      logs: balance > 0
+        ? [{ id: uid("l"), type: "charge", date: stampStr, order: "이월 잔액", amount: balance }]
+        : [],
+    };
+  });
+
+  try {
+    await saveLedger(`로그 이월 정리 (${archiveName})`);
+    render();
+    alert(`이월 정리가 완료되었습니다.\n과거 로그는 아카이브 목록의 ${archiveName}에서 볼 수 있습니다.`);
+  } catch (err) {
+    ledger.customers = before;
+    if (err.conflict) {
+      alert("다른 기기에서 장부가 먼저 수정되었습니다. 최신 장부를 다시 불러온 뒤 이월을 다시 실행해주세요.");
+      await reloadLedger();
+    } else {
+      alert("이월 저장에 실패했습니다. 장부는 변경되지 않았으니 다시 시도해주세요.");
+    }
+  }
+}
+
 function openBackupModal() {
   openModal("backupModal");
   renderBackupList();
 }
 
 // 파일별 최근 커밋 시각 조회 (실패해도 목록은 그대로 노출)
-async function fetchBackupTime(path) {
+async function fetchFileTime(path) {
   try {
     const res = await fetch(
       `${API_BASE}/commits?path=${encodeURIComponent(path)}&sha=${CONFIG.branch}&per_page=1`,
@@ -654,54 +712,62 @@ function formatTime(date) {
     `${pad(date.getHours())}:${pad(date.getMinutes())} 저장`;
 }
 
-async function renderBackupList() {
-  const body = $("backupContent");
-  body.innerHTML = '<div class="empty">백업 목록을 불러오는 중…</div>';
+// 폴더 안의 장부 JSON 파일들을 커밋 시각과 함께 표시 (백업/아카이브 공용)
+async function renderFileList(dir, nameRe, container, emptyMsg) {
+  container.innerHTML = '<div class="empty">목록을 불러오는 중…</div>';
 
   try {
-    const res = await fetch(`${API_BASE}/contents/${CONFIG.backupDir}?ref=${CONFIG.branch}`, {
+    const res = await fetch(`${API_BASE}/contents/${dir}?ref=${CONFIG.branch}`, {
       headers: apiHeaders(),
       cache: "no-store",
     });
-    // 백업 폴더는 첫 백업 때 만들어지므로, 없으면(404) 빈 목록으로 처리
+    // 폴더는 첫 파일 커밋 때 만들어지므로, 없으면(404) 빈 목록으로 처리
     if (res.status === 404) {
-      body.innerHTML = '<div class="empty">아직 백업 파일이 없습니다.</div>';
+      container.innerHTML = `<div class="empty">${emptyMsg}</div>`;
       return;
     }
     if (!res.ok) throw new Error();
     const files = (await res.json())
-      .filter((f) => f.type === "file" && BACKUP_NAME_RE.test(f.name))
+      .filter((f) => f.type === "file" && nameRe.test(f.name))
       .sort((a, b) => b.name.localeCompare(a.name)); // 최신 날짜 먼저
 
     if (files.length === 0) {
-      body.innerHTML = '<div class="empty">아직 백업 파일이 없습니다.</div>';
+      container.innerHTML = `<div class="empty">${emptyMsg}</div>`;
       return;
     }
 
-    const times = await Promise.all(files.map((f) => fetchBackupTime(`${CONFIG.backupDir}/${f.name}`)));
-    body.innerHTML = files.map((f, i) => `
+    const times = await Promise.all(files.map((f) => fetchFileTime(`${dir}/${f.name}`)));
+    container.innerHTML = files.map((f, i) => `
       <div class="backup-row">
         <div>
           <div class="backup-name">${escapeHtml(f.name)}</div>
           <div class="backup-time">${escapeHtml(formatTime(times[i]))}</div>
         </div>
-        <button class="csv-btn" data-name="${escapeHtml(f.name)}">CSV 다운로드</button>
+        <button class="csv-btn" data-dir="${escapeHtml(dir)}" data-name="${escapeHtml(f.name)}">CSV 다운로드</button>
       </div>`).join("");
 
-    body.querySelectorAll(".csv-btn").forEach((btn) => {
-      btn.addEventListener("click", () => downloadBackupCsv(btn));
+    container.querySelectorAll(".csv-btn").forEach((btn) => {
+      btn.addEventListener("click", () => downloadFileCsv(btn));
     });
   } catch {
-    body.innerHTML = '<div class="empty">백업 목록을 불러오지 못했습니다.</div>';
+    container.innerHTML = '<div class="empty">목록을 불러오지 못했습니다.</div>';
   }
 }
 
-async function downloadBackupCsv(btn) {
-  const name = btn.dataset.name;
+function renderBackupList() {
+  renderFileList(CONFIG.backupDir, BACKUP_NAME_RE, $("backupContent"), "아직 백업 파일이 없습니다.");
+}
+
+function renderArchiveList() {
+  renderFileList(CONFIG.archiveDir, ARCHIVE_NAME_RE, $("archiveContent"), "아직 아카이브 파일이 없습니다.");
+}
+
+async function downloadFileCsv(btn) {
+  const { dir, name } = btn.dataset;
   btn.disabled = true;
   btn.textContent = "변환 중…";
   try {
-    const res = await fetch(`${API_BASE}/contents/${CONFIG.backupDir}/${name}?ref=${CONFIG.branch}`, {
+    const res = await fetch(`${API_BASE}/contents/${dir}/${name}?ref=${CONFIG.branch}`, {
       headers: apiHeaders(),
       cache: "no-store",
     });
@@ -709,7 +775,7 @@ async function downloadBackupCsv(btn) {
     const data = JSON.parse(decodeContent((await res.json()).content));
     downloadText(ledgerToCsv(data), name.replace(/\.json$/, ".csv"));
   } catch {
-    alert("백업 파일을 내려받지 못했습니다. 잠시 후 다시 시도해주세요.");
+    alert("파일을 내려받지 못했습니다. 잠시 후 다시 시도해주세요.");
   } finally {
     btn.disabled = false;
     btn.textContent = "CSV 다운로드";
@@ -894,9 +960,19 @@ $("menuBackupList").addEventListener("click", () => {
   $("backupMenu").classList.add("hidden");
   openBackupModal();
 });
+$("menuArchive").addEventListener("click", () => {
+  $("backupMenu").classList.add("hidden");
+  archiveLogs();
+});
+$("menuArchiveList").addEventListener("click", () => {
+  $("backupMenu").classList.add("hidden");
+  openModal("archiveModal");
+  renderArchiveList();
+});
 document.addEventListener("click", () => $("backupMenu").classList.add("hidden"));
 
 $("closeBackupBtn").addEventListener("click", () => closeModal("backupModal"));
+$("closeArchiveBtn").addEventListener("click", () => closeModal("archiveModal"));
 $("closeLogBtn").addEventListener("click", () => closeModal("logModal"));
 
 MODAL_IDS.forEach((id) => {

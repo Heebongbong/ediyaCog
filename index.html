@@ -55,6 +55,9 @@
             <div id="backupMenu" class="menu hidden">
               <button id="menuCreateBackup">백업 생성</button>
               <button id="menuBackupList">백업 목록</button>
+              <hr class="menu-divider" />
+              <button id="menuArchive">로그 이월 정리</button>
+              <button id="menuArchiveList">아카이브 목록</button>
             </div>
           </div>
           <button id="logoutBtn" class="icon-btn" title="로그아웃">
@@ -206,6 +209,19 @@
         </button>
       </div>
       <div id="backupContent" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- 아카이브 목록 팝업 -->
+  <div id="archiveModal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h2>아카이브 목록</h2>
+        <button id="closeArchiveBtn" class="icon-btn" title="닫기">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="archiveContent" class="modal-body"></div>
     </div>
   </div>
 

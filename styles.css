@@ -214,6 +214,7 @@ button {
   transition: background .12s;
 }
 .menu button:hover { background: #F1F4FA; }
+.menu-divider { border: 0; border-top: 1px solid var(--line); margin: 5px 4px; }
 
 .status-pill {
   display: inline-flex;
