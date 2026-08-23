@@ -31,6 +31,15 @@ body.modal-open { overflow: hidden; }
 
 .hidden { display: none !important; }
 
+/* iOS 사파리의 기본 폼 스타일(둥근 모서리·내부 그림자) 제거 */
+input,
+textarea,
+button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+input[type="search"]::-webkit-search-decoration { display: none; }
+
 button {
   border: 0;
   font: inherit;
@@ -158,6 +167,7 @@ button {
   top: 0;
   z-index: 10;
   background: rgba(255, 255, 255, .88);
+  -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
 }
@@ -241,6 +251,8 @@ button {
   max-width: 760px;
   margin: 0 auto;
   padding: 20px 16px 64px;
+  /* 아이폰 홈바 영역 침범 방지 */
+  padding-bottom: calc(64px + env(safe-area-inset-bottom));
 }
 
 /* overflow: hidden을 쓰면 내부 th의 sticky가 무력화되므로 모서리는 개별 처리 */
@@ -515,11 +527,14 @@ td.log-cell { padding: 8px; }
   align-items: center;
   justify-content: center;
   padding: 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  overscroll-behavior: contain;
 }
 .modal-box {
   background: var(--surface);
   width: min(560px, 100%);
   max-height: 82vh;
+  max-height: 82dvh; /* iOS 사파리 주소창 변동 대응 */
   border-radius: 18px;
   display: flex;
   flex-direction: column;
@@ -534,7 +549,7 @@ td.log-cell { padding: 8px; }
   border-bottom: 1px solid var(--line);
 }
 .modal-head h2 { margin: 0; font-size: 16px; font-weight: 800; }
-.modal-body { overflow: auto; padding: 4px 8px 12px; }
+.modal-body { overflow: auto; padding: 4px 8px 12px; overscroll-behavior: contain; }
 .modal-hint { margin: 10px 14px 6px; font-size: 12px; color: var(--faint); }
 
 /* 로그 팝업 */
@@ -618,8 +633,6 @@ td.log-cell { padding: 8px; }
 .csv-btn:disabled { opacity: .55; cursor: default; }
 
 @media (max-width: 560px) {
-  .modal { padding: 0; align-items: flex-end; }
-  .modal-box { border-radius: 18px 18px 0 0; max-height: 88vh; }
-  #customerModal .modal-box { width: 100%; }
+  .modal { padding: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
   th, td { padding-left: 14px; padding-right: 14px; }
 }

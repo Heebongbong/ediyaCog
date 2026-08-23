@@ -35,7 +35,11 @@ function escapeHtml(text) {
 }
 
 function uid(prefix) {
-  return prefix + "-" + crypto.randomUUID().slice(0, 8);
+  // crypto.randomUUID는 구형 iOS 사파리(15.4 미만)에 없음
+  const rand = crypto.randomUUID
+    ? crypto.randomUUID().slice(0, 8)
+    : Math.random().toString(16).slice(2, 10);
+  return prefix + "-" + rand;
 }
 
 function nowStamp() {
@@ -810,7 +814,8 @@ function downloadText(text, filename) {
   link.href = URL.createObjectURL(blob);
   link.download = filename;
   link.click();
-  URL.revokeObjectURL(link.href);
+  // 사파리에서 즉시 해제하면 다운로드가 취소될 수 있어 지연 해제
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }
 
 // ── 로그 팝업 ───────────────────────────────────────────────
