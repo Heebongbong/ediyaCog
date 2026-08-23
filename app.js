@@ -52,6 +52,15 @@ function findCustomer(id) {
   return (ledger?.customers || []).find((c) => String(c.id) === String(id));
 }
 
+// 삭제는 소프트 삭제: deleted 플래그만 세우고 로그는 보존
+function activeCustomers() {
+  return (ledger?.customers || []).filter((c) => !c.deleted);
+}
+
+function deletedCustomers() {
+  return (ledger?.customers || []).filter((c) => c.deleted);
+}
+
 function sortedLogs(customer) {
   return [...(customer.logs || [])].sort((a, b) => String(a.date).localeCompare(String(b.date)));
 }
@@ -223,9 +232,11 @@ function closeAllModals() {
   MODAL_IDS.forEach(closeModal);
 }
 
-// ── 라우팅: #/ 목록, #/c/{id} 상세, #/c/{id}/edit/{logId} 수정 ──
+// ── 라우팅: #/ 목록, #/c/{id} 상세, #/c/{id}/edit/{logId} 수정,
+//            #/deleted 삭제된 고객 ─────────────────────────────
 function parseHash() {
   const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
+  if (parts[0] === "deleted") return { view: "deleted" };
   if (parts[0] === "c" && parts[1]) {
     if (parts[2] === "edit" && parts[3]) return { view: "edit", customerId: parts[1], logId: parts[3] };
     return { view: "detail", customerId: parts[1] };
@@ -238,10 +249,20 @@ function render() {
   closeAllModals();
 
   const route = parseHash();
+  const show = (name) => {
+    $("listView").classList.toggle("hidden", name !== "list");
+    $("detailView").classList.toggle("hidden", name !== "detail");
+    $("deletedView").classList.toggle("hidden", name !== "deleted");
+  };
+
   if (route.view === "list") {
-    $("listView").classList.remove("hidden");
-    $("detailView").classList.add("hidden");
+    show("list");
     renderList();
+    return;
+  }
+  if (route.view === "deleted") {
+    show("deleted");
+    renderDeleted();
     return;
   }
 
@@ -249,13 +270,12 @@ function render() {
   const log = route.view === "edit"
     ? (customer?.logs || []).find((l) => l.id === route.logId)
     : null;
-  if (!customer || (route.view === "edit" && !log)) {
+  if (!customer || customer.deleted || (route.view === "edit" && !log)) {
     location.hash = "#/";
     return;
   }
 
-  $("listView").classList.add("hidden");
-  $("detailView").classList.remove("hidden");
+  show("detail");
   renderDetail(customer, log);
 }
 
@@ -268,8 +288,12 @@ function updateSortMarks() {
 }
 
 function renderList() {
-  const customers = ledger.customers || [];
+  const customers = activeCustomers();
   $("customerCount").textContent = `고객 ${customers.length}명`;
+
+  const deletedTotal = deletedCustomers().length;
+  $("deletedLink").classList.toggle("hidden", deletedTotal === 0);
+  $("deletedLink").textContent = `삭제된 고객 ${deletedTotal}명 보기`;
   const total = customers.reduce((sum, c) => sum + balanceOf(c), 0);
   $("totalBalance").innerHTML = `잔액 합계 <strong>${won(total)}</strong>`;
 
@@ -316,6 +340,101 @@ function renderList() {
   });
 }
 
+// ── 삭제된 고객 ─────────────────────────────────────────────
+function renderDeleted() {
+  const customers = deletedCustomers();
+  $("deletedCount").textContent = `삭제된 고객 ${customers.length}명`;
+
+  const tbody = $("deletedRows");
+  if (customers.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">삭제된 고객이 없습니다.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = customers.map((c) => {
+    const balance = balanceOf(c);
+    return `
+      <tr>
+        <td>
+          <span class="name">${escapeHtml(c.name)}</span>
+          <div class="deleted-at">${escapeHtml(c.deletedAt || "")} 삭제</div>
+        </td>
+        <td class="money${balance <= 0 ? " zero" : ""}">${won(balance)}</td>
+        <td class="log-cell">
+          <button class="icon-btn log-btn" data-id="${escapeHtml(c.id)}" title="사용 내역">${HISTORY_ICON}</button>
+        </td>
+        <td class="log-cell">
+          <button class="restore-btn" data-id="${escapeHtml(c.id)}">복구</button>
+        </td>
+      </tr>`;
+  }).join("");
+
+  tbody.querySelectorAll(".log-btn").forEach((btn) => {
+    btn.addEventListener("click", () => openLogModal(btn.dataset.id));
+  });
+  tbody.querySelectorAll(".restore-btn").forEach((btn) => {
+    btn.addEventListener("click", () => restoreCustomer(btn));
+  });
+}
+
+async function deleteCustomer() {
+  const customer = findCustomer(currentCustomerId);
+  if (!customer) return;
+
+  const balance = balanceOf(customer);
+  const question = balance > 0
+    ? `"${customer.name}" 고객의 잔액이 ${won(balance)} 남아 있습니다.\n그래도 삭제할까요? (삭제된 고객 목록에서 복구할 수 있습니다)`
+    : `"${customer.name}" 고객을 삭제할까요?\n삭제된 고객 목록에서 복구할 수 있습니다.`;
+  if (!confirm(question)) return;
+
+  customer.deleted = true;
+  customer.deletedAt = nowStamp();
+  const rollback = () => { delete customer.deleted; delete customer.deletedAt; };
+
+  const btn = $("deleteCustomerBtn");
+  btn.disabled = true;
+  try {
+    await saveLedger(`고객 삭제: ${customer.name}`);
+    location.hash = "#/";
+  } catch (err) {
+    rollback();
+    if (err.conflict) {
+      alert("다른 기기에서 장부가 먼저 수정되었습니다. 최신 장부를 다시 불러옵니다.");
+      await reloadLedger();
+    } else {
+      alert("삭제에 실패했습니다. 네트워크 확인 후 다시 시도해주세요.");
+    }
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function restoreCustomer(btn) {
+  const customer = findCustomer(btn.dataset.id);
+  if (!customer) return;
+  if (!confirm(`"${customer.name}" 고객을 복구할까요?`)) return;
+
+  const deletedAt = customer.deletedAt;
+  delete customer.deleted;
+  delete customer.deletedAt;
+  const rollback = () => { customer.deleted = true; customer.deletedAt = deletedAt; };
+
+  btn.disabled = true;
+  try {
+    await saveLedger(`고객 복구: ${customer.name}`);
+    renderDeleted();
+  } catch (err) {
+    rollback();
+    btn.disabled = false;
+    if (err.conflict) {
+      alert("다른 기기에서 장부가 먼저 수정되었습니다. 최신 장부를 다시 불러옵니다.");
+      await reloadLedger();
+    } else {
+      alert("복구에 실패했습니다. 네트워크 확인 후 다시 시도해주세요.");
+    }
+  }
+}
+
 // ── 상세 (신규 차감·충전 / 로그 수정 겸용) ──────────────────
 function renderDetail(customer, log) {
   currentCustomerId = customer.id;
@@ -328,6 +447,7 @@ function renderDetail(customer, log) {
   $("cancelEditBtn").classList.toggle("hidden", !log);
   $("editInfo").classList.toggle("hidden", !log);
   $("typeToggle").classList.toggle("hidden", !!log); // 수정 시엔 종류 변경 불가
+  $("deleteCustomerBtn").classList.toggle("hidden", !!log);
 
   if (log) {
     $("editInfo").textContent =
@@ -635,6 +755,9 @@ function openLogModal(customerId) {
   $("logTitle").textContent = `${customer.name} 사용 내역`;
   const logs = sortedLogs(customer);
 
+  // 삭제된 고객의 로그는 조회만 가능 (수정 진입 차단)
+  const readOnly = !!customer.deleted;
+
   if (logs.length === 0) {
     $("logContent").innerHTML = '<div class="empty">아직 기록이 없습니다.</div>';
   } else {
@@ -642,23 +765,26 @@ function openLogModal(customerId) {
     const rows = [...logs].reverse().map((log) => {
       const isCharge = log.type === "charge";
       return `
-        <div class="log-row" data-log-id="${escapeHtml(log.id)}">
+        <div class="log-row${readOnly ? " readonly" : ""}" data-log-id="${escapeHtml(log.id)}">
           <span class="log-order">${escapeHtml(log.order)}</span>
           <span class="log-amt ${isCharge ? "amt-charge" : "amt-deduct"}">${isCharge ? "+" : "−"}${won(log.amount)}</span>
           <span class="log-date">${escapeHtml(log.date)}</span>
           <span class="log-bal">잔액 ${won(timeline.get(log.id))}</span>
         </div>`;
     }).join("");
-    $("logContent").innerHTML =
-      `<p class="modal-hint">기록을 누르면 내용을 수정할 수 있어요.</p>${rows}`;
+    $("logContent").innerHTML = readOnly
+      ? rows
+      : `<p class="modal-hint">기록을 누르면 내용을 수정할 수 있어요.</p>${rows}`;
 
-    $("logContent").querySelectorAll(".log-row").forEach((row) => {
-      row.addEventListener("click", () => {
-        const logId = row.dataset.logId;
-        closeModal("logModal");
-        location.hash = `#/c/${customerId}/edit/${logId}`;
+    if (!readOnly) {
+      $("logContent").querySelectorAll(".log-row").forEach((row) => {
+        row.addEventListener("click", () => {
+          const logId = row.dataset.logId;
+          closeModal("logModal");
+          location.hash = `#/c/${customerId}/edit/${logId}`;
+        });
       });
-    });
+    }
   }
 
   openModal("logModal");
@@ -742,6 +868,9 @@ document.querySelectorAll("th.sortable").forEach((th) => {
 });
 $("backBtn").addEventListener("click", () => { location.hash = "#/"; });
 $("cancelEditBtn").addEventListener("click", () => { location.hash = "#/"; });
+$("deleteCustomerBtn").addEventListener("click", deleteCustomer);
+$("deletedLink").addEventListener("click", () => { location.hash = "#/deleted"; });
+$("deletedBackBtn").addEventListener("click", () => { location.hash = "#/"; });
 $("detailForm").addEventListener("submit", handleDetailSubmit);
 $("typeToggle").addEventListener("click", (e) => {
   const btn = e.target.closest("button[data-type]");

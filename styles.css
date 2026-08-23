@@ -333,6 +333,36 @@ td.log-cell { padding: 8px; }
   padding: 44px 16px;
 }
 
+/* 삭제된 고객 보기 링크 */
+.deleted-link {
+  display: block;
+  margin: 14px auto 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  border-radius: 10px;
+  transition: background .15s, color .15s;
+}
+.deleted-link:hover { background: #ECEFF6; color: var(--text); }
+
+/* ── 삭제된 고객 화면 ────────────────────── */
+/* 이 화면엔 검색 툴바가 없어 테이블 헤더를 상단 헤더 바로 아래에 고정 */
+#deletedView th { top: 56px; }
+.deleted-at { font-size: 12px; color: var(--faint); margin-top: 3px; }
+.restore-btn {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--green);
+  background: #E7F5EC;
+  border-radius: 9px;
+  padding: 8px 12px;
+  white-space: nowrap;
+  transition: background .15s;
+}
+.restore-btn:hover { background: #D9EEE1; }
+.restore-btn:disabled { opacity: .55; cursor: default; }
+
 /* ── 상세 화면 ───────────────────────────── */
 .back-btn {
   display: inline-flex;
@@ -456,6 +486,19 @@ td.log-cell { padding: 8px; }
   color: var(--muted);
 }
 
+.delete-customer-btn {
+  display: block;
+  margin: 18px auto 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--red);
+  border-radius: 10px;
+  transition: background .15s;
+}
+.delete-customer-btn:hover { background: #FBEAE8; }
+.delete-customer-btn:disabled { opacity: .55; cursor: default; }
+
 .form-error { min-height: 20px; margin-top: 12px; font-size: 13px; color: var(--red); }
 .form-actions { display: flex; gap: 10px; margin-top: 6px; }
 .form-actions .secondary { flex: 1; }
@@ -506,6 +549,8 @@ td.log-cell { padding: 8px; }
 }
 .log-row:last-child { border-bottom: 0; }
 .log-row:hover { background: #F6F8FC; }
+.log-row.readonly { cursor: default; }
+.log-row.readonly:hover { background: none; }
 .log-order { font-weight: 600; font-size: 14.5px; word-break: break-all; }
 .log-amt {
   font-weight: 700;

@@ -91,6 +91,7 @@
             <tbody id="customerRows"></tbody>
           </table>
         </div>
+        <button id="deletedLink" class="deleted-link hidden"></button>
       </section>
 
       <!-- 상세 -->
@@ -127,6 +128,31 @@
               <button type="submit" id="submitBtn" class="primary">차감하고 저장</button>
             </div>
           </form>
+          <button type="button" id="deleteCustomerBtn" class="delete-customer-btn">고객 삭제</button>
+        </div>
+      </section>
+
+      <!-- 삭제된 고객 -->
+      <section id="deletedView" class="hidden">
+        <button id="deletedBackBtn" class="back-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          목록
+        </button>
+        <div class="card">
+          <div class="card-head">
+            <span id="deletedCount"></span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>고객명</th>
+                <th class="col-money">남은 잔액</th>
+                <th class="col-log">로그</th>
+                <th class="col-log">복구</th>
+              </tr>
+            </thead>
+            <tbody id="deletedRows"></tbody>
+          </table>
         </div>
       </section>
     </main>
