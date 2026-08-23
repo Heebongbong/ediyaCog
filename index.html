@@ -3,279 +3,611 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light" />
+  <meta name="theme-color" content="#1A2C63" />
   <title>이디야 선결제 장부</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
   <style>
+    :root {
+      --navy-900: #14224E;
+      --navy-800: #1A2C63;
+      --navy-600: #24418E;
+      --navy-500: #33549F;
+      --bg: #F1F3F9;
+      --surface: #FFFFFF;
+      --text: #1C2340;
+      --muted: #686F8C;
+      --faint: #9BA2BC;
+      --line: #E4E7F0;
+      --red: #C2382B;
+      --green: #1E7B4F;
+      --amber-bg: #FFF6E5;
+      --amber-text: #8A5A00;
+      --ring: 0 0 0 3px rgba(36, 65, 142, .14);
+      --shadow: 0 1px 2px rgba(16, 24, 64, .04), 0 8px 24px rgba(16, 24, 64, .06);
+    }
+
     * { box-sizing: border-box; }
+
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f5f7fb;
-      color: #222;
+      font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", "Malgun Gothic", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
     }
-    .wrap {
-      max-width: 920px;
-      margin: 0 auto;
-      padding: 24px 16px 60px;
-    }
-    .header {
-      display: flex;
-      gap: 10px;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 18px;
-    }
-    h1 { margin: 0; font-size: 26px; }
-    h2 { margin-top: 0; }
-    .muted { color: #777; font-size: 13px; }
-    .toolbar {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin: 15px 0;
-    }
-    button {
-      border: 0;
-      border-radius: 8px;
-      padding: 10px 14px;
-      cursor: pointer;
-      font-weight: 600;
-    }
-    .primary { background: #1d4f91; color: white; }
-    .secondary { background: #e9eef6; color: #223; }
-    .danger { background: #b42318; color: white; }
-    .card {
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 2px 12px rgba(0,0,0,.06);
-      padding: 18px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    th, td {
-      border-bottom: 1px solid #eee;
-      padding: 13px 10px;
-      text-align: left;
-    }
-    th { background: #fafafa; font-size: 14px; }
-    .name-link {
-      color: #1d4f91;
-      font-weight: 700;
-      cursor: pointer;
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
-    .money { font-weight: 700; }
-    .empty {
-      text-align: center;
-      color: #888;
-      padding: 36px 12px;
-    }
+    body.modal-open { overflow: hidden; }
+
     .hidden { display: none !important; }
 
-    .detail-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-    }
-    label {
-      display: block;
-      font-size: 13px;
-      margin-bottom: 6px;
-      color: #555;
-      font-weight: 600;
-    }
-    input, textarea {
-      width: 100%;
-      border: 1px solid #d7dbe2;
-      border-radius: 8px;
-      padding: 11px;
+    button {
+      border: 0;
       font: inherit;
+      cursor: pointer;
+      background: none;
+      color: inherit;
     }
-    textarea { resize: vertical; min-height: 90px; }
-    .balance-box {
-      padding: 18px;
-      border-radius: 10px;
-      background: #f1f5fb;
-      margin-bottom: 18px;
-    }
-    .balance-box strong { font-size: 28px; color: #1d4f91; }
 
-    .modal {
+    .primary {
+      background: var(--navy-600);
+      color: #fff;
+      font-weight: 700;
+      border-radius: 12px;
+      height: 48px;
+      padding: 0 20px;
+      transition: background .15s;
+    }
+    .primary:hover { background: var(--navy-500); }
+    .primary:active { transform: translateY(1px); }
+    .primary:disabled { opacity: .55; cursor: default; transform: none; }
+
+    .secondary {
+      background: #EDF0F7;
+      color: var(--text);
+      font-weight: 700;
+      border-radius: 12px;
+      height: 48px;
+      padding: 0 20px;
+      transition: background .15s;
+    }
+    .secondary:hover { background: #E2E7F2; }
+
+    .icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: inline-grid;
+      place-items: center;
+      color: var(--muted);
+      transition: background .15s, color .15s;
+    }
+    .icon-btn:hover { background: #EEF1F8; color: var(--text); }
+    .icon-btn svg { width: 18px; height: 18px; }
+
+    /* ── 토큰 게이트 ─────────────────────────── */
+    .gate {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,.45);
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 18px;
+      padding: 24px;
+      background: linear-gradient(160deg, var(--navy-900) 0%, var(--navy-600) 65%, var(--navy-500) 100%);
+    }
+    .gate-card {
+      width: min(400px, 100%);
+      background: var(--surface);
+      border-radius: 20px;
+      padding: 36px 28px 26px;
+      box-shadow: 0 24px 60px rgba(8, 14, 40, .35);
+      text-align: center;
+    }
+    .gate-logo {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 16px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: linear-gradient(135deg, var(--navy-800), var(--navy-500));
+    }
+    .gate-logo svg { width: 28px; height: 28px; }
+    .gate-card h1 { margin: 0 0 6px; font-size: 21px; font-weight: 800; }
+    .gate-desc { margin: 0 0 24px; font-size: 14px; color: var(--muted); }
+    .gate-card label {
+      display: block;
+      text-align: left;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .gate-card input {
+      width: 100%;
+      height: 48px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0 14px;
+      font: inherit;
+      margin-bottom: 12px;
+    }
+    .gate-card input:focus { outline: none; border-color: var(--navy-600); box-shadow: var(--ring); }
+    .gate-card .primary { width: 100%; }
+    .gate-error { min-height: 20px; margin-top: 12px; font-size: 13px; color: var(--red); }
+    .gate-hint { margin: 6px 0 0; font-size: 12px; color: var(--faint); line-height: 1.6; }
+
+    /* ── 로딩 스플래시 ───────────────────────── */
+    .splash {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .spinner {
+      width: 30px;
+      height: 30px;
+      border: 3px solid #D9DFEE;
+      border-top-color: var(--navy-600);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── 앱 공통 ─────────────────────────────── */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(255, 255, 255, .88);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--line);
+    }
+    .header-inner {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 15px;
+      font-weight: 800;
+    }
+    .brand-mark {
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: linear-gradient(135deg, var(--navy-800), var(--navy-500));
+    }
+    .brand-mark svg { width: 16px; height: 16px; }
+    .header-right { display: flex; align-items: center; gap: 8px; }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .status-pill::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .status-pill.is-saving { background: #EEF1F8; color: var(--muted); }
+    .status-pill.is-saved { background: #E7F5EC; color: var(--green); }
+    .status-pill.is-error { background: #FBEAE8; color: var(--red); }
+
+    .wrap {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 20px 16px 64px;
+    }
+
+    .card {
+      background: var(--surface);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    /* ── 목록 화면 ───────────────────────────── */
+    .search-box { position: relative; margin-bottom: 14px; }
+    .search-box svg {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 17px;
+      height: 17px;
+      color: var(--faint);
+      pointer-events: none;
+    }
+    .search-box input {
+      width: 100%;
+      height: 46px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0 14px 0 40px;
+      font: inherit;
+      background: var(--surface);
+    }
+    .search-box input:focus { outline: none; border-color: var(--navy-600); box-shadow: var(--ring); }
+
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      padding: 13px 18px;
+      border-bottom: 1px solid var(--line);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .card-head strong { color: var(--text); font-variant-numeric: tabular-nums; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--faint);
+      letter-spacing: .04em;
+      text-align: left;
+      padding: 11px 18px;
+      border-bottom: 1px solid var(--line);
+      background: #FAFBFE;
+    }
+    td { padding: 15px 18px; border-bottom: 1px solid var(--line); }
+    tr:last-child td { border-bottom: 0; }
+
+    .customer-row { cursor: pointer; transition: background .12s; }
+    .customer-row:hover { background: #F6F8FC; }
+    .name { font-weight: 700; color: var(--navy-600); }
+    th.col-money, td.money { text-align: right; }
+    .money { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .money.zero { color: var(--faint); }
+    th.col-log, td.log-cell { text-align: center; width: 64px; }
+    td.log-cell { padding: 8px; }
+
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      font-size: 14px;
+      padding: 44px 16px;
+    }
+
+    /* ── 상세 화면 ───────────────────────────── */
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      padding: 8px 10px;
+      margin: 0 0 10px -10px;
+      border-radius: 10px;
+      transition: background .15s, color .15s;
+    }
+    .back-btn:hover { background: #ECEFF6; color: var(--text); }
+    .back-btn svg { width: 16px; height: 16px; }
+
+    .detail-card { padding: 24px 22px; }
+    .detail-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .detail-head h2 { margin: 0; font-size: 21px; font-weight: 800; }
+    .badge {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--amber-bg);
+      color: var(--amber-text);
+    }
+
+    .balance-hero {
+      border-radius: 14px;
+      padding: 20px 22px;
+      background: linear-gradient(135deg, var(--navy-800), var(--navy-500));
+      color: #fff;
+      margin-bottom: 18px;
+    }
+    .balance-hero span {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .05em;
+      color: rgba(255, 255, 255, .65);
+    }
+    .balance-hero strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 32px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .edit-info {
+      background: var(--amber-bg);
+      color: var(--amber-text);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+
+    #detailForm label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      margin: 16px 0 6px;
+    }
+    #detailForm textarea,
+    #detailForm input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font: inherit;
+    }
+    #detailForm textarea { resize: vertical; min-height: 84px; }
+    #detailForm textarea:focus,
+    #detailForm input:focus { outline: none; border-color: var(--navy-600); box-shadow: var(--ring); }
+
+    .amount-field { position: relative; }
+    .amount-field input {
+      padding-right: 40px;
+      font-weight: 700;
+      font-size: 16px;
+      font-variant-numeric: tabular-nums;
+    }
+    .amount-field .unit {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .form-error { min-height: 20px; margin-top: 12px; font-size: 13px; color: var(--red); }
+    .form-actions { display: flex; gap: 10px; margin-top: 6px; }
+    .form-actions .secondary { flex: 1; }
+    .form-actions .primary { flex: 2.4; }
+
+    /* ── 로그 팝업 ───────────────────────────── */
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      background: rgba(13, 19, 46, .5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
     }
     .modal-box {
-      background: white;
-      width: min(760px, 100%);
+      background: var(--surface);
+      width: min(560px, 100%);
       max-height: 82vh;
-      overflow: auto;
-      border-radius: 12px;
-      padding: 20px;
+      border-radius: 18px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
     .modal-head {
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
       gap: 12px;
-      margin-bottom: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--line);
     }
-    .status {
-      min-height: 22px;
-      margin: 10px 0;
-      font-size: 14px;
-      color: #1d4f91;
+    .modal-head h2 { margin: 0; font-size: 16px; font-weight: 800; }
+    .modal-body { overflow: auto; padding: 4px 8px 12px; }
+    .modal-hint { margin: 10px 14px 6px; font-size: 12px; color: var(--faint); }
+
+    .log-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      column-gap: 12px;
+      row-gap: 4px;
+      padding: 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #EFF1F7;
+      transition: background .12s;
+    }
+    .log-row:last-child { border-bottom: 0; }
+    .log-row:hover { background: #F6F8FC; }
+    .log-order { font-weight: 600; font-size: 14.5px; word-break: break-all; }
+    .log-amt {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      justify-self: end;
+      white-space: nowrap;
+    }
+    .amt-deduct { color: var(--red); }
+    .amt-charge { color: var(--green); }
+    .log-date { font-size: 12px; color: var(--faint); }
+    .log-bal {
+      font-size: 12px;
+      color: var(--muted);
+      justify-self: end;
+      font-variant-numeric: tabular-nums;
     }
 
-    @media (max-width: 640px) {
-      .detail-grid { grid-template-columns: 1fr; }
-      th:nth-child(3), td:nth-child(3) { width: 78px; }
-      .header { align-items: flex-start; flex-direction: column; }
+    @media (max-width: 560px) {
+      .modal { padding: 0; align-items: flex-end; }
+      .modal-box { border-radius: 18px 18px 0 0; max-height: 88vh; }
+      th, td { padding-left: 14px; padding-right: 14px; }
     }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="header">
-      <div>
-        <h1>이디야 선결제 장부</h1>
-        <div class="muted">서버 없이 JSON 파일로 관리</div>
+
+  <!-- 토큰 게이트 (로그인) -->
+  <div id="gateView" class="gate hidden">
+    <form id="gateForm" class="gate-card">
+      <div class="gate-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a3 3 0 0 1 0 6h-1"/><path d="M3 8h14v6a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5V8z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
       </div>
-      <div id="fileName" class="muted">JSON 미연결</div>
-    </div>
-
-    <section id="listView">
-      <div class="toolbar">
-        <button class="primary" id="openBtn">장부 JSON 열기</button>
-        <button class="secondary" id="saveBtn">JSON 저장</button>
-      </div>
-
-      <div style="margin: 14px 0;">
-        <label for="searchInput">이름 검색</label>
-        <input
-          id="searchInput"
-          type="search"
-          placeholder="이름을 입력하세요"
-          autocomplete="off"
-        />
-      </div>
-
-      <div id="status" class="status"></div>
-
-      <div class="card">
-        <table>
-          <thead>
-            <tr>
-              <th>이름</th>
-              <th>선결제 잔액</th>
-              <th>로그</th>
-            </tr>
-          </thead>
-          <tbody id="customerRows">
-            <tr><td colspan="3" class="empty">먼저 data.json 파일을 열어주세요.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section id="detailView" class="hidden">
-      <div class="toolbar">
-        <button class="secondary" id="backBtn">← 목록으로</button>
-      </div>
-
-      <div class="card">
-        <h2 id="detailName">고객 상세</h2>
-        <div class="balance-box">
-          현재 잔액<br>
-          <strong id="detailBalance">0원</strong>
-        </div>
-
-        <div class="detail-grid">
-          <div>
-            <label for="orderInput">이번 주문 내용</label>
-            <textarea id="orderInput" placeholder="예: 아이스 아메리카노 2잔"></textarea>
-          </div>
-          <div>
-            <label for="amountInput">차감 가격</label>
-            <input id="amountInput" type="number" min="0" step="100" placeholder="예: 6400" />
-          </div>
-        </div>
-
-        <div class="toolbar">
-          <button class="primary" id="deductBtn">차감 적용 + JSON 저장</button>
-        </div>
-        <div id="detailStatus" class="status"></div>
-      </div>
-    </section>
+      <h1>이디야 선결제 장부</h1>
+      <p class="gate-desc">토큰을 입력하면 장부를 불러옵니다.</p>
+      <label for="tokenInput">GitHub 액세스 토큰</label>
+      <input id="tokenInput" type="password" autocomplete="current-password" placeholder="github_pat_..." />
+      <button type="submit" id="gateBtn" class="primary">로그인</button>
+      <div id="gateError" class="gate-error"></div>
+      <p class="gate-hint">Fine-grained 토큰 · 대상 저장소만 선택 ·<br />Contents 읽기/쓰기 권한이 필요합니다.</p>
+    </form>
   </div>
 
+  <!-- 로딩 스플래시 -->
+  <div id="loadingView" class="splash hidden">
+    <div class="spinner"></div>
+    장부를 불러오는 중…
+  </div>
+
+  <!-- 앱 본체 -->
+  <div id="appView" class="hidden">
+    <header class="app-header">
+      <div class="header-inner">
+        <div class="brand">
+          <span class="brand-mark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a3 3 0 0 1 0 6h-1"/><path d="M3 8h14v6a5 5 0 0 1-5 5H8a5 5 0 0 1-5-5V8z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
+          </span>
+          이디야 선결제 장부
+        </div>
+        <div class="header-right">
+          <span id="saveStatus" class="status-pill hidden"></span>
+          <button id="backupBtn" class="icon-btn" title="장부 백업">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></svg>
+          </button>
+          <button id="logoutBtn" class="icon-btn" title="로그아웃">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <!-- 목록 -->
+      <section id="listView">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="searchInput" type="search" placeholder="고객 이름 검색" autocomplete="off" />
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <span id="customerCount"></span>
+            <span id="totalBalance"></span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>고객명</th>
+                <th class="col-money">남은 잔액</th>
+                <th class="col-log">로그</th>
+              </tr>
+            </thead>
+            <tbody id="customerRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 상세 -->
+      <section id="detailView" class="hidden">
+        <button id="backBtn" class="back-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          목록
+        </button>
+        <div class="card detail-card">
+          <div class="detail-head">
+            <h2 id="detailName"></h2>
+            <span id="editBadge" class="badge hidden">기록 수정 중</span>
+          </div>
+          <div class="balance-hero">
+            <span>현재 잔액</span>
+            <strong id="detailBalance"></strong>
+          </div>
+          <div id="editInfo" class="edit-info hidden"></div>
+          <form id="detailForm">
+            <label for="orderInput">주문 내용</label>
+            <textarea id="orderInput" placeholder="예: 아이스 아메리카노 2잔"></textarea>
+            <label for="amountInput">금액</label>
+            <div class="amount-field">
+              <input id="amountInput" inputmode="numeric" autocomplete="off" placeholder="0" />
+              <span class="unit">원</span>
+            </div>
+            <div id="formError" class="form-error"></div>
+            <div class="form-actions">
+              <button type="button" id="cancelEditBtn" class="secondary hidden">취소</button>
+              <button type="submit" id="submitBtn" class="primary">차감하고 저장</button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 로그 팝업 -->
   <div id="logModal" class="modal hidden">
     <div class="modal-box">
       <div class="modal-head">
-        <h2 id="logTitle" style="margin:0">사용 로그</h2>
-        <button class="secondary" id="closeLogBtn">닫기</button>
+        <h2 id="logTitle"></h2>
+        <button id="closeLogBtn" class="icon-btn" title="닫기">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
       </div>
-      <div id="logContent"></div>
+      <div id="logContent" class="modal-body"></div>
     </div>
   </div>
 
 <script>
+// ── 설정: 장부(data.json)가 있는 GitHub 저장소 (private) ────
+const CONFIG = {
+  owner: "Heebongbong",
+  repo: "ediyaData",
+  branch: "main",
+  path: "data.json",
+};
+const TOKEN_KEY = "ediya-ledger-token";
+const API_URL = `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.path}`;
+
+const HISTORY_ICON =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>';
+
+let token = localStorage.getItem(TOKEN_KEY) || "";
 let ledger = null;
-let fileHandle = null;
-let selectedCustomerId = null;
-let editingLogCustomerId = null;
-let editingLogIndex = null;
+let fileSha = null; // 저장 시 충돌 감지에 쓰는 GitHub contents sha
+let currentCustomerId = null;
+let editingLogId = null;
 
 const $ = (id) => document.getElementById(id);
 const won = (n) => Number(n || 0).toLocaleString("ko-KR") + "원";
-
-function setStatus(msg) {
-  $("status").textContent = msg || "";
-}
-
-function renderList() {
-  const tbody = $("customerRows");
-  tbody.innerHTML = "";
-
-  if (!ledger || !Array.isArray(ledger.customers) || ledger.customers.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" class="empty">고객 데이터가 없습니다.</td></tr>';
-    return;
-  }
-
-  const keyword = $("searchInput").value.trim().toLowerCase();
-  const customers = ledger.customers.filter(customer =>
-    String(customer.name || "").toLowerCase().includes(keyword)
-  );
-
-  if (customers.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="3" class="empty">검색 결과가 없습니다.</td></tr>';
-    return;
-  }
-
-  customers.forEach(customer => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td><span class="name-link" data-id="${customer.id}">${escapeHtml(customer.name)}</span></td>
-      <td class="money">${won(customer.balance)}</td>
-      <td><button class="secondary log-btn" data-id="${customer.id}">보기</button></td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  document.querySelectorAll(".name-link").forEach(el => {
-    el.addEventListener("click", () => openDetail(Number(el.dataset.id)));
-  });
-
-  document.querySelectorAll(".log-btn").forEach(el => {
-    el.addEventListener("click", () => openLog(Number(el.dataset.id)));
-  });
-}
 
 function escapeHtml(text) {
   const div = document.createElement("div");
@@ -283,286 +615,483 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-async function openJson() {
-  if (!window.showOpenFilePicker) {
-    alert("이 기능은 Chrome/Edge 계열 브라우저에서 사용하는 것을 권장합니다.");
+function uid() {
+  return "l-" + crypto.randomUUID().slice(0, 8);
+}
+
+function nowStamp() {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ` +
+    `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
+
+function parseAmount(text) {
+  return Number(String(text).replace(/[^\d]/g, ""));
+}
+
+// ── 잔액 계산: 잔액은 저장하지 않고 항상 로그에서 파생 ──────
+function findCustomer(id) {
+  return (ledger?.customers || []).find((c) => String(c.id) === String(id));
+}
+
+function sortedLogs(customer) {
+  return [...(customer.logs || [])].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+}
+
+function signedAmount(log) {
+  return (log.type === "charge" ? 1 : -1) * Number(log.amount || 0);
+}
+
+function balanceOf(customer) {
+  return (customer.logs || []).reduce((sum, log) => sum + signedAmount(log), 0);
+}
+
+// 로그 id → 그 시점의 잔액
+function balanceTimeline(customer) {
+  const map = new Map();
+  let balance = 0;
+  for (const log of sortedLogs(customer)) {
+    balance += signedAmount(log);
+    map.set(log.id, balance);
+  }
+  return map;
+}
+
+// 시간순으로 훑어 잔액이 음수가 되는 시점이 있는지 검사
+function wouldGoNegative(customer) {
+  let balance = 0;
+  for (const log of sortedLogs(customer)) {
+    balance += signedAmount(log);
+    if (balance < 0) return true;
+  }
+  return false;
+}
+
+// ── GitHub API ──────────────────────────────────────────────
+function apiHeaders() {
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+  };
+}
+
+function decodeContent(base64) {
+  const bin = atob(base64.replace(/\n/g, ""));
+  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+}
+
+function encodeContent(text) {
+  const bytes = new TextEncoder().encode(text);
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
+async function loadLedger() {
+  const res = await fetch(`${API_URL}?ref=${CONFIG.branch}`, {
+    headers: apiHeaders(),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const messages = {
+      401: "토큰이 올바르지 않습니다.",
+      403: "권한이 없습니다. 토큰의 Contents 권한을 확인해주세요.",
+      404: "data.json을 찾을 수 없습니다. 저장소 설정 또는 토큰의 저장소 접근 범위를 확인해주세요.",
+    };
+    const err = new Error(messages[res.status] || `GitHub 응답 오류 (${res.status})`);
+    err.status = res.status;
+    throw err;
+  }
+  const data = await res.json();
+  const parsed = JSON.parse(decodeContent(data.content));
+  if (!Array.isArray(parsed.customers)) throw new Error("장부 형식이 올바르지 않습니다.");
+  ledger = parsed;
+  fileSha = data.sha;
+}
+
+async function saveLedger(message) {
+  setSaveStatus("saving");
+  const res = await fetch(API_URL, {
+    method: "PUT",
+    headers: apiHeaders(),
+    body: JSON.stringify({
+      message,
+      branch: CONFIG.branch,
+      sha: fileSha,
+      content: encodeContent(JSON.stringify(ledger, null, 2)),
+    }),
+  });
+  if (res.status === 409) {
+    setSaveStatus("error");
+    const err = new Error("conflict");
+    err.conflict = true;
+    throw err;
+  }
+  if (!res.ok) {
+    setSaveStatus("error");
+    throw new Error(`저장 실패 (${res.status})`);
+  }
+  fileSha = (await res.json()).content.sha;
+  setSaveStatus("saved");
+}
+
+// 현재 장부를 같은 저장소에 data_YYYY-MM-DD.json으로 커밋 (같은 날짜면 덮어씀)
+async function backupLedger() {
+  if (!ledger) return;
+  const backupPath = `data_${nowStamp().slice(0, 10)}.json`;
+  if (!confirm(`현재 장부를 ${backupPath} 파일로 백업할까요?\n오늘 백업한 파일이 이미 있으면 덮어씁니다.`)) return;
+
+  const url = `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${backupPath}`;
+  setSaveStatus("saving", "백업 중…");
+  try {
+    // 이미 있는 파일이면 sha가 필요하므로 먼저 조회
+    const existing = await fetch(`${url}?ref=${CONFIG.branch}`, {
+      headers: apiHeaders(),
+      cache: "no-store",
+    });
+    const sha = existing.ok ? (await existing.json()).sha : undefined;
+
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: apiHeaders(),
+      body: JSON.stringify({
+        message: `장부 백업 (${backupPath})`,
+        branch: CONFIG.branch,
+        content: encodeContent(JSON.stringify(ledger, null, 2)),
+        ...(sha ? { sha } : {}),
+      }),
+    });
+    if (!res.ok) throw new Error(`백업 실패 (${res.status})`);
+    setSaveStatus("saved", `백업 완료 ${new Date().toTimeString().slice(0, 5)}`);
+  } catch (err) {
+    setSaveStatus("error", "백업 실패");
+    alert("백업에 실패했습니다. 네트워크와 토큰 권한을 확인해주세요.");
+  }
+}
+
+async function reloadLedger() {
+  try {
+    await loadLedger();
+    render();
+  } catch (err) {
+    alert("장부를 다시 불러오지 못했습니다. 페이지를 새로고침해주세요.");
+  }
+}
+
+// ── 화면 전환 ───────────────────────────────────────────────
+function showScreen(name) {
+  $("gateView").classList.toggle("hidden", name !== "gate");
+  $("loadingView").classList.toggle("hidden", name !== "loading");
+  $("appView").classList.toggle("hidden", name !== "app");
+  if (name === "gate") $("tokenInput").focus();
+}
+
+function setSaveStatus(state, label) {
+  const pill = $("saveStatus");
+  pill.className = "status-pill";
+  const time = new Date().toTimeString().slice(0, 5);
+  if (state === "saving") {
+    pill.classList.add("is-saving");
+    pill.textContent = label || "저장 중…";
+  } else if (state === "saved") {
+    pill.classList.add("is-saved");
+    pill.textContent = label || `저장됨 ${time}`;
+  } else if (state === "error") {
+    pill.classList.add("is-error");
+    pill.textContent = label || "저장 실패";
+  } else {
+    pill.classList.add("is-saved");
+    pill.textContent = "최신 상태";
+  }
+}
+
+// ── 라우팅: #/ 목록, #/c/{id} 차감, #/c/{id}/edit/{logId} 수정 ──
+function parseHash() {
+  const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
+  if (parts[0] === "c" && parts[1]) {
+    if (parts[2] === "edit" && parts[3]) return { view: "edit", customerId: parts[1], logId: parts[3] };
+    return { view: "detail", customerId: parts[1] };
+  }
+  return { view: "list" };
+}
+
+function render() {
+  if (!ledger) return;
+  closeLogModal();
+
+  const route = parseHash();
+  if (route.view === "list") {
+    $("listView").classList.remove("hidden");
+    $("detailView").classList.add("hidden");
+    renderList();
     return;
   }
 
-  try {
-    [fileHandle] = await window.showOpenFilePicker({
-      types: [{
-        description: "JSON 장부 파일",
-        accept: { "application/json": [".json"] }
-      }],
-      multiple: false
-    });
-
-    const file = await fileHandle.getFile();
-    const text = await file.text();
-    ledger = JSON.parse(text);
-
-    if (!ledger.customers || !Array.isArray(ledger.customers)) {
-      throw new Error("customers 배열이 없습니다.");
-    }
-
-    $("fileName").textContent = file.name;
-    setStatus("장부를 불러왔습니다.");
-    renderList();
-  } catch (err) {
-    if (err.name !== "AbortError") {
-      console.error(err);
-      alert("JSON 파일을 읽지 못했습니다. 파일 형식을 확인해주세요.");
-    }
+  const customer = findCustomer(route.customerId);
+  const log = route.view === "edit"
+    ? (customer?.logs || []).find((l) => l.id === route.logId)
+    : null;
+  if (!customer || (route.view === "edit" && !log)) {
+    location.hash = "#/";
+    return;
   }
-}
-
-async function saveJson() {
-  if (!ledger) {
-    alert("먼저 JSON 파일을 열어주세요.");
-    return false;
-  }
-
-  const text = JSON.stringify(ledger, null, 2);
-
-  if (fileHandle && window.showSaveFilePicker) {
-    try {
-      const writable = await fileHandle.createWritable();
-      await writable.write(text);
-      await writable.close();
-      setStatus("JSON 파일에 저장했습니다.");
-      return true;
-    } catch (err) {
-      console.error(err);
-      alert("파일 저장에 실패했습니다.");
-      return false;
-    }
-  }
-
-  // File System Access API를 쓸 수 없는 경우 다운로드 백업
-  const blob = new Blob([text], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "data.json";
-  a.click();
-  URL.revokeObjectURL(url);
-  return true;
-}
-
-function openDetail(id) {
-  const customer = ledger.customers.find(c => Number(c.id) === Number(id));
-  if (!customer) return;
-
-  selectedCustomerId = id;
-  $("detailName").textContent = customer.name;
-  $("detailBalance").textContent = won(customer.balance);
-  $("orderInput").value = "";
-  $("amountInput").value = "";
-  $("detailStatus").textContent = "";
 
   $("listView").classList.add("hidden");
   $("detailView").classList.remove("hidden");
+  renderDetail(customer, log);
 }
 
-function backToList() {
-  selectedCustomerId = null;
-  $("detailView").classList.add("hidden");
-  $("listView").classList.remove("hidden");
-  renderList();
+// ── 목록 ────────────────────────────────────────────────────
+function renderList() {
+  const customers = ledger.customers || [];
+  $("customerCount").textContent = `고객 ${customers.length}명`;
+  const total = customers.reduce((sum, c) => sum + balanceOf(c), 0);
+  $("totalBalance").innerHTML = `잔액 합계 <strong>${won(total)}</strong>`;
+
+  const tbody = $("customerRows");
+  const keyword = $("searchInput").value.trim().toLowerCase();
+  const visible = customers.filter((c) =>
+    String(c.name || "").toLowerCase().includes(keyword)
+  );
+
+  if (visible.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3" class="empty">${
+      customers.length ? "검색 결과가 없습니다." : "고객 데이터가 없습니다."
+    }</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = visible.map((c) => {
+    const balance = balanceOf(c);
+    return `
+      <tr class="customer-row" data-id="${escapeHtml(c.id)}">
+        <td><span class="name">${escapeHtml(c.name)}</span></td>
+        <td class="money${balance <= 0 ? " zero" : ""}">${won(balance)}</td>
+        <td class="log-cell">
+          <button class="icon-btn log-btn" data-id="${escapeHtml(c.id)}" title="사용 내역">${HISTORY_ICON}</button>
+        </td>
+      </tr>`;
+  }).join("");
+
+  tbody.querySelectorAll(".customer-row").forEach((tr) => {
+    tr.addEventListener("click", () => { location.hash = `#/c/${tr.dataset.id}`; });
+  });
+  tbody.querySelectorAll(".log-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openLogModal(btn.dataset.id);
+    });
+  });
 }
 
-async function deduct() {
-  if (!ledger || selectedCustomerId == null) return;
+// ── 상세 (신규 차감 / 로그 수정 겸용) ───────────────────────
+function renderDetail(customer, log) {
+  currentCustomerId = customer.id;
+  editingLogId = log ? log.id : null;
 
-  const customer = ledger.customers.find(c => Number(c.id) === Number(selectedCustomerId));
+  $("detailName").textContent = customer.name;
+  $("detailBalance").textContent = won(balanceOf(customer));
+  $("formError").textContent = "";
+  $("editBadge").classList.toggle("hidden", !log);
+  $("cancelEditBtn").classList.toggle("hidden", !log);
+  $("editInfo").classList.toggle("hidden", !log);
+
+  if (log) {
+    $("editInfo").textContent =
+      `${log.date} · ${log.type === "charge" ? "충전" : "차감"} 기록을 수정하고 있습니다.`;
+    $("orderInput").value = log.order || "";
+    $("amountInput").value = Number(log.amount || 0).toLocaleString("ko-KR");
+    $("submitBtn").textContent = "수정 저장";
+  } else {
+    $("orderInput").value = "";
+    $("amountInput").value = "";
+    $("submitBtn").textContent = "차감하고 저장";
+  }
+}
+
+function setSubmitting(on) {
+  const btn = $("submitBtn");
+  btn.disabled = on;
+  btn.textContent = on ? "저장 중…" : (editingLogId ? "수정 저장" : "차감하고 저장");
+}
+
+async function handleDetailSubmit(e) {
+  e.preventDefault();
+  const customer = findCustomer(currentCustomerId);
   if (!customer) return;
 
+  const showError = (msg) => { $("formError").textContent = msg; };
   const order = $("orderInput").value.trim();
-  const amount = Number($("amountInput").value);
+  const amount = parseAmount($("amountInput").value);
+  if (!order) return showError("주문 내용을 입력해주세요.");
+  if (!Number.isFinite(amount) || amount <= 0) return showError("금액을 올바르게 입력해주세요.");
 
-  if (!order) {
-    alert("주문 내용을 입력해주세요.");
-    return;
-  }
-  if (!Number.isFinite(amount) || amount <= 0) {
-    alert("차감 가격을 올바르게 입력해주세요.");
-    return;
-  }
-  if (amount > Number(customer.balance)) {
-    alert("차감 금액이 현재 잔액보다 큽니다.");
-    return;
-  }
-
-  const oldBalance = Number(customer.balance);
-  const newBalance = oldBalance - amount;
-  customer.balance = newBalance;
   customer.logs = Array.isArray(customer.logs) ? customer.logs : [];
 
-  const now = new Date();
-  const pad = n => String(n).padStart(2, "0");
-  const stamp =
-    `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ` +
-    `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-
-  customer.logs.unshift({
-    date: stamp,
-    order,
-    amount,
-    balance: newBalance
-  });
-
-  const saved = await saveJson();
-  if (!saved) {
-    customer.balance = oldBalance;
-    customer.logs.shift();
-    return;
+  let rollback, message;
+  if (editingLogId) {
+    const log = customer.logs.find((l) => l.id === editingLogId);
+    if (!log) return;
+    const before = { order: log.order, amount: log.amount };
+    log.order = order;
+    log.amount = amount;
+    rollback = () => Object.assign(log, before);
+    message = `${customer.name} 기록 수정: ${order} ${won(amount)}`;
+  } else {
+    customer.logs.push({ id: uid(), type: "deduct", date: nowStamp(), order, amount });
+    rollback = () => customer.logs.pop();
+    message = `${customer.name} ${won(amount)} 차감: ${order}`;
   }
 
-  $("detailBalance").textContent = won(newBalance);
-  $("detailStatus").textContent = `${won(amount)} 차감했습니다.`;
-  $("orderInput").value = "";
-  $("amountInput").value = "";
+  if (wouldGoNegative(customer)) {
+    rollback();
+    return showError(editingLogId
+      ? "이 금액으로 수정하면 잔액이 음수가 되는 시점이 생깁니다."
+      : `잔액(${won(balanceOf(customer))})보다 큰 금액은 차감할 수 없습니다.`);
+  }
+
+  setSubmitting(true);
+  try {
+    await saveLedger(message);
+    location.hash = "#/";
+  } catch (err) {
+    rollback();
+    if (err.conflict) {
+      alert("다른 기기에서 장부가 먼저 수정되었습니다. 최신 장부를 다시 불러옵니다.");
+      await reloadLedger();
+    } else {
+      showError("저장에 실패했습니다. 네트워크 확인 후 다시 시도해주세요.");
+    }
+  } finally {
+    setSubmitting(false);
+  }
 }
 
-function openLog(id) {
-  const customer = ledger.customers.find(c => Number(c.id) === Number(id));
+// ── 로그 팝업 ───────────────────────────────────────────────
+function openLogModal(customerId) {
+  const customer = findCustomer(customerId);
   if (!customer) return;
 
-  $("logTitle").textContent = `${customer.name} 사용 로그`;
-  const logs = Array.isArray(customer.logs) ? customer.logs : [];
+  $("logTitle").textContent = `${customer.name} 사용 내역`;
+  const logs = sortedLogs(customer);
 
   if (logs.length === 0) {
-    $("logContent").innerHTML = '<div class="empty">사용 로그가 없습니다.</div>';
+    $("logContent").innerHTML = '<div class="empty">아직 기록이 없습니다.</div>';
   } else {
-    $("logContent").innerHTML = `
-      <table>
-        <thead>
-          <tr>
-            <th>날짜</th>
-            <th>내용</th>
-            <th>차감</th>
-            <th>잔액</th>
-            <th>수정</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${logs.map((log, index) => `
-            <tr>
-              <td>${escapeHtml(log.date)}</td>
-              <td>${escapeHtml(log.order)}</td>
-              <td>${won(log.amount)}</td>
-              <td>${won(log.balance)}</td>
-              <td><button class="secondary edit-log-btn" data-id="${customer.id}" data-index="${index}">수정</button></td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
-    `;
+    const timeline = balanceTimeline(customer);
+    const rows = [...logs].reverse().map((log) => {
+      const isCharge = log.type === "charge";
+      return `
+        <div class="log-row" data-log-id="${escapeHtml(log.id)}">
+          <span class="log-order">${escapeHtml(log.order)}</span>
+          <span class="log-amt ${isCharge ? "amt-charge" : "amt-deduct"}">${isCharge ? "+" : "−"}${won(log.amount)}</span>
+          <span class="log-date">${escapeHtml(log.date)}</span>
+          <span class="log-bal">잔액 ${won(timeline.get(log.id))}</span>
+        </div>`;
+    }).join("");
+    $("logContent").innerHTML =
+      `<p class="modal-hint">기록을 누르면 내용을 수정할 수 있어요.</p>${rows}`;
 
-    document.querySelectorAll(".edit-log-btn").forEach(btn => {
-      btn.addEventListener("click", () => openEditLog(Number(btn.dataset.id), Number(btn.dataset.index)));
+    $("logContent").querySelectorAll(".log-row").forEach((row) => {
+      row.addEventListener("click", () => {
+        const logId = row.dataset.logId;
+        closeLogModal();
+        location.hash = `#/c/${customerId}/edit/${logId}`;
+      });
     });
   }
 
   $("logModal").classList.remove("hidden");
+  document.body.classList.add("modal-open");
 }
 
-function openEditLog(customerId, logIndex) {
-  const customer = ledger.customers.find(c => Number(c.id) === Number(customerId));
-  if (!customer || !customer.logs?.[logIndex]) return;
-
-  editingLogCustomerId = customerId;
-  editingLogIndex = logIndex;
-  $("editOrderInput").value = customer.logs[logIndex].order || "";
-  $("editAmountInput").value = Number(customer.logs[logIndex].amount || 0);
-  $("editLogStatus").textContent = "";
-  $("editLogModal").classList.remove("hidden");
+function closeLogModal() {
+  $("logModal").classList.add("hidden");
+  document.body.classList.remove("modal-open");
 }
 
-function recalculateCustomerBalances(customer) {
-  const logs = Array.isArray(customer.logs) ? customer.logs : [];
-  if (!logs.length) return;
+// ── 토큰 게이트 / 시작 ──────────────────────────────────────
+async function handleGateSubmit(e) {
+  e.preventDefault();
+  const value = $("tokenInput").value.trim();
+  if (!value) return;
 
-  // 로그는 최신순이므로 가장 오래된 기록의 '차감 전 잔액'을 기준으로 다시 계산
-  const oldest = logs[logs.length - 1];
-  let runningBalance = Number(oldest.balance || 0) + Number(oldest.amount || 0);
+  token = value;
+  const btn = $("gateBtn");
+  btn.disabled = true;
+  btn.textContent = "확인 중…";
+  $("gateError").textContent = "";
 
-  for (let i = logs.length - 1; i >= 0; i--) {
-    runningBalance -= Number(logs[i].amount || 0);
-    logs[i].balance = runningBalance;
+  try {
+    await loadLedger();
+    localStorage.setItem(TOKEN_KEY, token);
+    $("tokenInput").value = "";
+    $("saveStatus").classList.remove("hidden");
+    setSaveStatus("synced");
+    showScreen("app");
+    render();
+  } catch (err) {
+    token = "";
+    $("gateError").textContent = err.message || "장부를 불러오지 못했습니다.";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "로그인";
   }
-  customer.balance = runningBalance;
 }
 
-async function saveEditedLog() {
-  const customer = ledger.customers.find(c => Number(c.id) === Number(editingLogCustomerId));
-  if (!customer || editingLogIndex == null || !customer.logs?.[editingLogIndex]) return;
+function logout() {
+  if (!confirm("로그아웃할까요? 다시 이용하려면 토큰을 입력해야 합니다.")) return;
+  localStorage.removeItem(TOKEN_KEY);
+  token = "";
+  ledger = null;
+  fileSha = null;
+  location.hash = "#/";
+  showScreen("gate");
+}
 
-  const order = $("editOrderInput").value.trim();
-  const amount = Number($("editAmountInput").value);
-  if (!order) return alert("주문 내용을 입력해주세요.");
-  if (!Number.isFinite(amount) || amount <= 0) return alert("차감 가격을 올바르게 입력해주세요.");
-
-  const backup = JSON.parse(JSON.stringify(customer));
-  customer.logs[editingLogIndex].order = order;
-  customer.logs[editingLogIndex].amount = amount;
-  recalculateCustomerBalances(customer);
-
-  if (customer.balance < 0) {
-    Object.keys(customer).forEach(k => delete customer[k]);
-    Object.assign(customer, backup);
-    return alert("수정 후 잔액이 음수가 됩니다. 금액을 확인해주세요.");
-  }
-
-  const saved = await saveJson();
-  if (!saved) {
-    Object.keys(customer).forEach(k => delete customer[k]);
-    Object.assign(customer, backup);
+async function init() {
+  if (!token) {
+    showScreen("gate");
     return;
   }
-
-  $("editLogModal").classList.add("hidden");
-  renderList();
-  openLog(editingLogCustomerId);
+  showScreen("loading");
+  try {
+    await loadLedger();
+    $("saveStatus").classList.remove("hidden");
+    setSaveStatus("synced");
+    showScreen("app");
+    render();
+  } catch (err) {
+    showScreen("gate");
+    $("gateError").textContent = err.status === 401
+      ? "저장된 토큰이 만료되었거나 올바르지 않습니다. 다시 입력해주세요."
+      : (err.message || "장부를 불러오지 못했습니다.");
+  }
 }
 
-$("openBtn").addEventListener("click", openJson);
-$("saveBtn").addEventListener("click", saveJson);
+// ── 이벤트 연결 ─────────────────────────────────────────────
+$("gateForm").addEventListener("submit", handleGateSubmit);
+$("backupBtn").addEventListener("click", backupLedger);
+$("logoutBtn").addEventListener("click", logout);
 $("searchInput").addEventListener("input", renderList);
-$("backBtn").addEventListener("click", backToList);
-$("deductBtn").addEventListener("click", deduct);
-$("closeLogBtn").addEventListener("click", () => $("logModal").classList.add("hidden"));
-$("logModal").addEventListener("click", e => {
-  if (e.target === $("logModal")) $("logModal").classList.add("hidden");
+$("backBtn").addEventListener("click", () => { location.hash = "#/"; });
+$("cancelEditBtn").addEventListener("click", () => { location.hash = "#/"; });
+$("detailForm").addEventListener("submit", handleDetailSubmit);
+$("closeLogBtn").addEventListener("click", closeLogModal);
+$("logModal").addEventListener("click", (e) => {
+  if (e.target === $("logModal")) closeLogModal();
 });
-$("saveEditLogBtn").addEventListener("click", saveEditedLog);
-$("closeEditLogBtn").addEventListener("click", () => $("editLogModal").classList.add("hidden"));
-$("editLogModal").addEventListener("click", e => {
-  if (e.target === $("editLogModal")) $("editLogModal").classList.add("hidden");
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeLogModal();
 });
+$("amountInput").addEventListener("input", () => {
+  const digits = $("amountInput").value.replace(/[^\d]/g, "");
+  $("amountInput").value = digits ? Number(digits).toLocaleString("ko-KR") : "";
+});
+window.addEventListener("hashchange", render);
+
+init();
 </script>
-
-  <div id="editLogModal" class="modal hidden">
-    <div class="modal-box" style="max-width:520px;">
-      <div class="modal-head">
-        <h2 style="margin:0">로그 수정</h2>
-        <button class="secondary" id="closeEditLogBtn">닫기</button>
-      </div>
-      <div style="margin-bottom:12px;">
-        <label for="editOrderInput">주문 내용</label>
-        <textarea id="editOrderInput"></textarea>
-      </div>
-      <div style="margin-bottom:12px;">
-        <label for="editAmountInput">차감 가격</label>
-        <input id="editAmountInput" type="number" min="0" step="100" />
-      </div>
-      <div class="toolbar">
-        <button class="primary" id="saveEditLogBtn">수정 저장</button>
-      </div>
-      <div id="editLogStatus" class="status"></div>
-    </div>
-  </div>
-
 </body>
 </html>
