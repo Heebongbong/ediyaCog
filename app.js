@@ -80,6 +80,8 @@ function parseAmount(text) {
   return Number(String(text).replace(/[^\d]/g, ""));
 }
 
+const PHONE_RE = /^010-\d{4}-\d{4}$/;
+
 // ── 잔액 계산: 잔액은 저장하지 않고 항상 로그에서 파생 ──────
 function findCustomer(id) {
   return (ledger?.customers || []).find((c) => String(c.id) === String(id));
@@ -471,6 +473,8 @@ function renderDetail(customer, log) {
   editingLogId = log ? log.id : null;
 
   $("detailName").textContent = customer.name;
+  $("detailPhone").textContent = customer.phone || "";
+  $("detailPhone").classList.toggle("hidden", !customer.phone);
   $("detailBalance").textContent = won(balanceOf(customer));
   $("formError").textContent = "";
   $("editBadge").classList.toggle("hidden", !log);
@@ -583,8 +587,10 @@ async function handleCustomerSubmit(e) {
   e.preventDefault();
   const showError = (msg) => { $("customerError").textContent = msg; };
   const name = $("customerNameInput").value.trim();
+  const phone = $("customerPhoneInput").value.trim();
   const amount = parseAmount($("customerAmountInput").value);
   if (!name) return showError("고객 이름을 입력해주세요.");
+  if (phone && !PHONE_RE.test(phone)) return showError("연락처는 010-0000-0000 형식으로 입력해주세요.");
   if (!Number.isFinite(amount) || amount <= 0) return showError("충전 금액을 올바르게 입력해주세요.");
 
   const duplicated = (ledger.customers || []).some((c) => c.name === name);
@@ -593,6 +599,7 @@ async function handleCustomerSubmit(e) {
   const customer = {
     id: uid("c"),
     name,
+    ...(phone ? { phone } : {}),
     logs: [{ id: uid("l"), type: "charge", date: nowStamp(), order: "선결제 충전", amount }],
   };
   ledger.customers = Array.isArray(ledger.customers) ? ledger.customers : [];
@@ -814,13 +821,14 @@ async function downloadFileCsv(btn) {
 function ledgerToCsv(ledgerObj) {
   const BOM = String.fromCharCode(0xFEFF);
   const cell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const rows = [["고객명", "날짜", "구분", "내용", "금액", "잔액"]];
+  const rows = [["고객명", "연락처", "날짜", "구분", "내용", "금액", "잔액"]];
   for (const customer of ledgerObj.customers || []) {
     let balance = 0;
     for (const log of sortedLogs(customer)) {
       balance += signedAmount(log);
       rows.push([
         customer.name,
+        customer.phone || "",
         log.date,
         log.type === "charge" ? "충전" : "차감",
         log.order,
@@ -848,6 +856,8 @@ function openLogModal(customerId) {
   if (!customer) return;
 
   $("logTitle").textContent = `${customer.name} 사용 내역`;
+  $("logPhone").textContent = customer.phone || "";
+  $("logPhone").classList.toggle("hidden", !customer.phone);
   const logs = sortedLogs(customer);
 
   // 삭제된 고객의 로그는 조회만 가능 (수정 진입 차단)
@@ -1025,6 +1035,15 @@ const formatAmountInput = (input) => {
 };
 $("amountInput").addEventListener("input", () => formatAmountInput($("amountInput")));
 $("customerAmountInput").addEventListener("input", () => formatAmountInput($("customerAmountInput")));
+
+// 연락처 입력 시 숫자만 남기고 010-0000-0000 형태로 하이픈 자동 삽입
+$("customerPhoneInput").addEventListener("input", () => {
+  const input = $("customerPhoneInput");
+  const digits = input.value.replace(/[^\d]/g, "").slice(0, 11);
+  input.value = [digits.slice(0, 3), digits.slice(3, 7), digits.slice(7)]
+    .filter(Boolean)
+    .join("-");
+});
 
 window.addEventListener("hashchange", render);
 

@@ -400,6 +400,12 @@ td.log-cell { padding: 8px; }
   margin-bottom: 16px;
 }
 .detail-head h2 { margin: 0; font-size: 21px; font-weight: 800; }
+.detail-phone {
+  margin: -10px 0 16px;
+  font-size: 14px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 .badge {
   font-size: 12px;
   font-weight: 700;
@@ -549,6 +555,12 @@ td.log-cell { padding: 8px; }
   border-bottom: 1px solid var(--line);
 }
 .modal-head h2 { margin: 0; font-size: 16px; font-weight: 800; }
+.modal-phone {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 .modal-body { overflow: auto; padding: 4px 8px 12px; overscroll-behavior: contain; }
 .modal-hint { margin: 10px 14px 6px; font-size: 12px; color: var(--faint); }
 
