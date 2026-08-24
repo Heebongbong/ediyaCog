@@ -48,6 +48,7 @@ let ledger = null;
 let fileSha = null; // 저장 시 충돌 감지에 쓰는 GitHub contents sha
 let currentCustomerId = null;
 let editingLogId = null;
+let editingCustomerId = null; // 고객 등록 팝업이 정보 수정 모드일 때 대상 고객 id
 let entryType = "deduct"; // 상세 화면 신규 기록의 종류 (deduct | charge)
 let sortKey = null; // 목록 정렬 기준 (name | balance), null이면 장부 순서 그대로
 let sortDir = 1; // 1 오름차순, -1 내림차순
@@ -482,6 +483,7 @@ function renderDetail(customer, log) {
   $("editInfo").classList.toggle("hidden", !log);
   $("typeToggle").classList.toggle("hidden", !!log); // 수정 시엔 종류 변경 불가
   $("deleteCustomerBtn").classList.toggle("hidden", !!log);
+  $("editCustomerBtn").classList.toggle("hidden", !!log);
 
   if (log) {
     $("editInfo").textContent =
@@ -575,10 +577,30 @@ async function handleDetailSubmit(e) {
   }
 }
 
-// ── 고객 등록 ───────────────────────────────────────────────
+// ── 고객 등록 / 정보 수정 (팝업 겸용) ───────────────────────
 function openCustomerModal() {
+  editingCustomerId = null;
   $("customerForm").reset();
   $("customerError").textContent = "";
+  $("customerModalTitle").textContent = "고객 등록";
+  $("customerAmountField").classList.remove("hidden");
+  $("customerSubmitBtn").textContent = "등록";
+  openModal("customerModal");
+  $("customerNameInput").focus();
+}
+
+// 상세화면에서 이름·연락처 수정: 등록 팝업을 재활용하고 충전 금액 필드만 숨김
+function openCustomerEditModal() {
+  const customer = findCustomer(currentCustomerId);
+  if (!customer) return;
+  editingCustomerId = customer.id;
+  $("customerForm").reset();
+  $("customerError").textContent = "";
+  $("customerNameInput").value = customer.name || "";
+  $("customerPhoneInput").value = customer.phone || "";
+  $("customerModalTitle").textContent = "고객 정보 수정";
+  $("customerAmountField").classList.add("hidden");
+  $("customerSubmitBtn").textContent = "저장";
   openModal("customerModal");
   $("customerNameInput").focus();
 }
@@ -588,32 +610,54 @@ async function handleCustomerSubmit(e) {
   const showError = (msg) => { $("customerError").textContent = msg; };
   const name = $("customerNameInput").value.trim();
   const phone = $("customerPhoneInput").value.trim();
-  const amount = parseAmount($("customerAmountInput").value);
   if (!name) return showError("고객 이름을 입력해주세요.");
   if (phone && !PHONE_RE.test(phone)) return showError("연락처는 010-0000-0000 형식으로 입력해주세요.");
-  if (!Number.isFinite(amount) || amount <= 0) return showError("충전 금액을 올바르게 입력해주세요.");
 
-  const duplicated = (ledger.customers || []).some((c) => c.name === name);
-  if (duplicated && !confirm(`"${name}" 고객이 이미 있습니다. 같은 이름으로 등록할까요?`)) return;
+  const editing = findCustomer(editingCustomerId);
+  let amount = 0;
+  if (!editing) {
+    amount = parseAmount($("customerAmountInput").value);
+    if (!Number.isFinite(amount) || amount <= 0) return showError("충전 금액을 올바르게 입력해주세요.");
+  }
 
-  const customer = {
-    id: uid("c"),
-    name,
-    ...(phone ? { phone } : {}),
-    logs: [{ id: uid("l"), type: "charge", date: nowStamp(), order: "선결제 충전", amount }],
-  };
-  ledger.customers = Array.isArray(ledger.customers) ? ledger.customers : [];
-  ledger.customers.push(customer);
+  const duplicated = (ledger.customers || []).some((c) => c !== editing && c.name === name);
+  if (duplicated && !confirm(`"${name}" 고객이 이미 있습니다. 같은 이름으로 저장할까요?`)) return;
+
+  let rollback, message;
+  if (editing) {
+    const before = { name: editing.name, phone: editing.phone };
+    editing.name = name;
+    if (phone) editing.phone = phone;
+    else delete editing.phone;
+    rollback = () => {
+      editing.name = before.name;
+      if (before.phone) editing.phone = before.phone;
+      else delete editing.phone;
+    };
+    message = `고객 정보 수정: ${name}`;
+  } else {
+    const customer = {
+      id: uid("c"),
+      name,
+      ...(phone ? { phone } : {}),
+      logs: [{ id: uid("l"), type: "charge", date: nowStamp(), order: "선결제 충전", amount }],
+    };
+    ledger.customers = Array.isArray(ledger.customers) ? ledger.customers : [];
+    ledger.customers.push(customer);
+    rollback = () => ledger.customers.pop();
+    message = `고객 등록: ${name} (${won(amount)} 충전)`;
+  }
 
   const btn = $("customerSubmitBtn");
+  const btnLabel = btn.textContent;
   btn.disabled = true;
   btn.textContent = "저장 중…";
   try {
-    await saveLedger(`고객 등록: ${name} (${won(amount)} 충전)`);
+    await saveLedger(message);
     closeModal("customerModal");
     render();
   } catch (err) {
-    ledger.customers.pop();
+    rollback();
     if (err.conflict) {
       alert("다른 기기에서 장부가 먼저 수정되었습니다. 최신 장부를 다시 불러옵니다.");
       closeModal("customerModal");
@@ -623,7 +667,7 @@ async function handleCustomerSubmit(e) {
     }
   } finally {
     btn.disabled = false;
-    btn.textContent = "등록";
+    btn.textContent = btnLabel;
   }
 }
 
@@ -986,6 +1030,7 @@ $("typeToggle").addEventListener("click", (e) => {
 });
 
 $("addCustomerBtn").addEventListener("click", openCustomerModal);
+$("editCustomerBtn").addEventListener("click", openCustomerEditModal);
 $("customerForm").addEventListener("submit", handleCustomerSubmit);
 $("closeCustomerBtn").addEventListener("click", () => closeModal("customerModal"));
 

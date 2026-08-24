@@ -106,6 +106,9 @@
         <div class="card detail-card">
           <div class="detail-head">
             <h2 id="detailName"></h2>
+            <button type="button" id="editCustomerBtn" class="icon-btn" title="고객 정보 수정">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+            </button>
             <span id="editBadge" class="badge hidden">기록 수정 중</span>
           </div>
           <div id="detailPhone" class="detail-phone hidden"></div>
@@ -182,7 +185,7 @@
   <div id="customerModal" class="modal hidden">
     <div class="modal-box">
       <div class="modal-head">
-        <h2>고객 등록</h2>
+        <h2 id="customerModalTitle">고객 등록</h2>
         <button id="closeCustomerBtn" class="icon-btn" title="닫기">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -192,10 +195,12 @@
         <input id="customerNameInput" autocomplete="off" placeholder="예: 홍길동" />
         <label for="customerPhoneInput">연락처 (선택)</label>
         <input id="customerPhoneInput" inputmode="numeric" autocomplete="off" placeholder="010-0000-0000" maxlength="13" />
-        <label for="customerAmountInput">최초 충전 금액</label>
-        <div class="amount-field">
-          <input id="customerAmountInput" inputmode="numeric" autocomplete="off" placeholder="0" />
-          <span class="unit">원</span>
+        <div id="customerAmountField">
+          <label for="customerAmountInput">최초 충전 금액</label>
+          <div class="amount-field">
+            <input id="customerAmountInput" inputmode="numeric" autocomplete="off" placeholder="0" />
+            <span class="unit">원</span>
+          </div>
         </div>
         <div id="customerError" class="form-error"></div>
         <div class="form-actions">
