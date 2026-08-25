@@ -526,16 +526,19 @@ async function handleDetailSubmit(e) {
 
   const showError = (msg) => { $("formError").textContent = msg; };
   let order = $("orderInput").value.trim();
-  const amount = parseAmount($("amountInput").value);
-  if (!Number.isFinite(amount) || amount <= 0) return showError("금액을 올바르게 입력해주세요.");
+  const amountRaw = $("amountInput").value.trim();
+  const amount = parseAmount(amountRaw);
+  const type = editingLogId
+    ? (customer.logs || []).find((l) => l.id === editingLogId)?.type
+    : entryType;
+  if (!amountRaw) return showError("금액을 입력해주세요.");
+  // 충전은 0원 허용 (기록만 남기는 용도), 차감은 1원 이상
+  if (!Number.isFinite(amount) || (type !== "charge" && amount <= 0)) {
+    return showError("금액을 올바르게 입력해주세요.");
+  }
 
   // 내용을 비워두면 종류에 맞는 기본 문구로 기록 (금액만 빠르게 적는 경우)
-  if (!order) {
-    const type = editingLogId
-      ? (customer.logs || []).find((l) => l.id === editingLogId)?.type
-      : entryType;
-    order = type === "charge" ? "선결제 충전" : "선결제 금액 사용";
-  }
+  if (!order) order = type === "charge" ? "선결제 충전" : "선결제 금액 사용";
 
   customer.logs = Array.isArray(customer.logs) ? customer.logs : [];
 
@@ -612,8 +615,10 @@ async function handleCustomerSubmit(e) {
   const editing = findCustomer(editingCustomerId);
   let amount = 0;
   if (!editing) {
-    amount = parseAmount($("customerAmountInput").value);
-    if (!Number.isFinite(amount) || amount <= 0) return showError("충전 금액을 올바르게 입력해주세요.");
+    const amountRaw = $("customerAmountInput").value.trim();
+    amount = parseAmount(amountRaw);
+    // 0원 등록 허용 (잔액 없이 고객만 먼저 등록하는 경우)
+    if (!amountRaw || !Number.isFinite(amount)) return showError("충전 금액을 올바르게 입력해주세요.");
   }
 
   const duplicated = (ledger.customers || []).some((c) => c !== editing && c.name === name);
