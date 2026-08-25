@@ -109,6 +109,12 @@ function balanceOf(customer) {
   return (customer.logs || []).reduce((sum, log) => sum + signedAmount(log), 0);
 }
 
+// 잔액 표시용 클래스: 0원은 회색, 외상(음수)은 빨간색
+function moneyClass(balance) {
+  if (balance < 0) return " minus";
+  return balance === 0 ? " zero" : "";
+}
+
 // 로그 id → 그 시점의 잔액
 function balanceTimeline(customer) {
   const map = new Map();
@@ -118,16 +124,6 @@ function balanceTimeline(customer) {
     map.set(log.id, balance);
   }
   return map;
-}
-
-// 시간순으로 훑어 잔액이 음수가 되는 시점이 있는지 검사
-function wouldGoNegative(customer) {
-  let balance = 0;
-  for (const log of sortedLogs(customer)) {
-    balance += signedAmount(log);
-    if (balance < 0) return true;
-  }
-  return false;
 }
 
 // ── GitHub API ──────────────────────────────────────────────
@@ -355,7 +351,7 @@ function renderList() {
     return `
       <tr class="customer-row" data-id="${escapeHtml(c.id)}">
         <td><span class="name">${escapeHtml(c.name)}</span></td>
-        <td class="money${balance <= 0 ? " zero" : ""}">${won(balance)}</td>
+        <td class="money${moneyClass(balance)}">${won(balance)}</td>
         <td class="log-cell">
           <button class="icon-btn log-btn" data-id="${escapeHtml(c.id)}" title="사용 내역">${HISTORY_ICON}</button>
         </td>
@@ -392,7 +388,7 @@ function renderDeleted() {
           <span class="name">${escapeHtml(c.name)}</span>
           <div class="deleted-at">${escapeHtml(c.deletedAt || "")} 삭제</div>
         </td>
-        <td class="money${balance <= 0 ? " zero" : ""}">${won(balance)}</td>
+        <td class="money${moneyClass(balance)}">${won(balance)}</td>
         <td class="log-cell">
           <button class="icon-btn log-btn" data-id="${escapeHtml(c.id)}" title="사용 내역">${HISTORY_ICON}</button>
         </td>
@@ -415,8 +411,8 @@ async function deleteCustomer() {
   if (!customer) return;
 
   const balance = balanceOf(customer);
-  const question = balance > 0
-    ? `"${customer.name}" 고객의 잔액이 ${won(balance)} 남아 있습니다.\n그래도 삭제할까요? (삭제된 고객 목록에서 복구할 수 있습니다)`
+  const question = balance !== 0
+    ? `"${customer.name}" 고객의 ${balance > 0 ? "잔액" : "외상"}이 ${won(Math.abs(balance))} 남아 있습니다.\n그래도 삭제할까요? (삭제된 고객 목록에서 복구할 수 있습니다)`
     : `"${customer.name}" 고객을 삭제할까요?\n삭제된 고객 목록에서 복구할 수 있습니다.`;
   if (!confirm(question)) return;
 
@@ -511,7 +507,9 @@ function setEntryType(type) {
   });
   const isCharge = type === "charge";
   $("orderLabel").textContent = isCharge ? "충전 내용" : "주문 내용";
-  $("orderInput").placeholder = isCharge ? "예: 5만원 선결제 충전" : "예: 아이스 아메리카노 2잔";
+  $("orderInput").placeholder = isCharge
+    ? "비워두면 '선결제 충전'으로 기록됩니다"
+    : "비워두면 '선결제 금액 사용'으로 기록됩니다";
   $("submitBtn").textContent = submitLabel();
 }
 
@@ -527,12 +525,17 @@ async function handleDetailSubmit(e) {
   if (!customer) return;
 
   const showError = (msg) => { $("formError").textContent = msg; };
-  const order = $("orderInput").value.trim();
+  let order = $("orderInput").value.trim();
   const amount = parseAmount($("amountInput").value);
-  if (!order) return showError(entryType === "charge" && !editingLogId
-    ? "충전 내용을 입력해주세요."
-    : "주문 내용을 입력해주세요.");
   if (!Number.isFinite(amount) || amount <= 0) return showError("금액을 올바르게 입력해주세요.");
+
+  // 내용을 비워두면 종류에 맞는 기본 문구로 기록 (금액만 빠르게 적는 경우)
+  if (!order) {
+    const type = editingLogId
+      ? (customer.logs || []).find((l) => l.id === editingLogId)?.type
+      : entryType;
+    order = type === "charge" ? "선결제 충전" : "선결제 금액 사용";
+  }
 
   customer.logs = Array.isArray(customer.logs) ? customer.logs : [];
 
@@ -551,13 +554,6 @@ async function handleDetailSubmit(e) {
     message = entryType === "charge"
       ? `${customer.name} ${won(amount)} 충전: ${order}`
       : `${customer.name} ${won(amount)} 차감: ${order}`;
-  }
-
-  if (wouldGoNegative(customer)) {
-    rollback();
-    return showError(editingLogId
-      ? "이 금액으로 수정하면 잔액이 음수가 되는 시점이 생깁니다."
-      : `잔액(${won(balanceOf(customer))})보다 큰 금액은 차감할 수 없습니다.`);
   }
 
   setSubmitting(true);
@@ -741,10 +737,17 @@ async function archiveLogs() {
   const before = ledger.customers;
   ledger.customers = before.map((c) => {
     const balance = balanceOf(c);
+    // 외상(음수 잔액)은 차감 1건으로 이월해 잔액을 그대로 보존
     return {
       ...c,
-      logs: balance > 0
-        ? [{ id: uid("l"), type: "charge", date: stampStr, order: "이월 잔액", amount: balance }]
+      logs: balance !== 0
+        ? [{
+            id: uid("l"),
+            type: balance > 0 ? "charge" : "deduct",
+            date: stampStr,
+            order: "이월 잔액",
+            amount: Math.abs(balance),
+          }]
         : [],
     };
   });

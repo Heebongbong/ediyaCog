@@ -336,6 +336,7 @@ th.sortable:hover { color: var(--text); }
 th.col-money, td.money { text-align: right; }
 .money { font-weight: 700; font-variant-numeric: tabular-nums; }
 .money.zero { color: var(--faint); }
+.money.minus { color: var(--red); }
 th.col-log, td.log-cell { text-align: center; width: 64px; }
 td.log-cell { padding: 8px; }
 
